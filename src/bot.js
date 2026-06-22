@@ -43,6 +43,15 @@ function hashPhone(phone) {
 // ============================================================
 var lastCredit = {};
 
+var ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '96ad19dd1d302c46aceea0edf9759655090b762f947f81a6107382e9681784a0', 'hex');
+
+function decryptPhone(encrypted) {
+  var parts = encrypted.split(':');
+  var iv = Buffer.from(parts[0], 'hex');
+  var decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+  return decipher.update(parts[1], 'hex', 'utf8') + decipher.final('utf8');
+}
+
 // ============================================================
 // Bot setup
 // ============================================================
@@ -74,7 +83,7 @@ bot.command('vip', async (ctx) => {
 
   var { data: customer } = await sb
     .from('customers')
-    .select('id, name, phone_hash')
+    .select('id, name, phone_hash, public_id')
     .eq('phone_hash', hash)
     .maybeSingle();
 
@@ -86,7 +95,7 @@ bot.command('vip', async (ctx) => {
   // Check if this chat already has a bound customer
   var { data: existingBound } = await sb
     .from('customers')
-    .select('id, name')
+    .select('id, name, public_id')
     .eq('telegram_id', chatId)
     .maybeSingle();
 
@@ -174,7 +183,7 @@ bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
 
   var { data: customer } = await sb
     .from('customers')
-    .select('id, name')
+    .select('id, name, public_id, parent_id, phone_encrypted')
     .eq('telegram_id', chatId)
     .maybeSingle();
 
@@ -204,7 +213,54 @@ bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
   // Track for undo
   lastCredit[chatId] = { amount: amount, customer_id: customer.id, prev_balance: bal ? bal.available_balance : 0 };
 
-  await ctx.reply('✅ +' + amount + '\n👤 ' + customer.name + '\n💰 Balance: ' + newBalance);
+  // Build reply — phone display
+  var phoneDisplay = '📱 已绑定';
+  if (customer.phone_encrypted) {
+    try {
+      var plain = decryptPhone(customer.phone_encrypted);
+      phoneDisplay = '📱 ' + plain.substring(0, 7) + '****' + plain.substring(plain.length - 4);
+    } catch(e) {}
+  }
+
+  var reply = '✅ +' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
+
+  // Commission chain: up to 4 levels
+  var rates = [0.01, 0.005, 0.003, 0.002];
+  var levelNames = ['直推', 'FF', 'FFF', 'Member'];
+  var commissionParts = [];
+  var currentParentId = customer.parent_id;
+
+  for (var level = 0; level < 4; level++) {
+    if (!currentParentId) break;
+
+    var { data: parent } = await sb
+      .from('customers')
+      .select('id, parent_id')
+      .eq('id', currentParentId)
+      .maybeSingle();
+
+    if (!parent) break;
+
+    var commissionAmt = Math.round(amount * rates[level] * 100) / 100;
+    if (commissionAmt > 0) {
+      await sb.from('commissions').insert({
+        referrer_id: parent.id,
+        amount: commissionAmt,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+      commissionParts.push('  ' + levelNames[level] + ' (' + (rates[level] * 100) + '%): +' + commissionAmt.toFixed(2));
+    }
+    currentParentId = parent.parent_id;
+  }
+
+  if (commissionParts.length > 0) {
+    reply += '\n━━━━━━━━━━━━━━━━\n🏆 推荐佣金\n' + commissionParts.join('\n');
+  }
+
+  reply += '\n📢 让朋友注册时填你的ID: ' + (customer.public_id || 'N/A');
+
+  await ctx.reply(reply);
 });
 
 // Also handle 下发X
@@ -300,7 +356,7 @@ bot.command('查账', async (ctx) => {
   var balance = bal ? bal.available_balance : 0;
   var earned = bal ? bal.total_earned : 0;
 
-  await ctx.reply('💰 ' + customer.name + '\nAvailable: ' + balance + '\nTotal Earned: ' + earned);
+  await ctx.reply('💰 ' + customer.name + '\n🔑 ' + (customer.public_id || 'N/A') + '\nAvailable: ' + balance + '\nTotal Earned: ' + earned);
 });
 
 // ============================================================
