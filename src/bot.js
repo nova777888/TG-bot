@@ -83,6 +83,9 @@ bot.command('vip', async (ctx) => {
     return;
   }
 
+  // Clear any existing binding for this chat, then bind
+  await sb.from('customers').update({ telegram_id: null }).eq('telegram_id', chatId);
+
   var { error: updateErr } = await sb
     .from('customers')
     .update({ telegram_id: chatId })
