@@ -81,7 +81,7 @@ async function isBankLinkedToReferrer(customerId) {
   return null;
 }
 
-var ENCRYPTION_KEY
+
 
 var ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '96ad19dd1d302c46aceea0edf9759655090b762f947f81a6107382e9681784a0', 'hex');
 
@@ -337,7 +337,7 @@ bot.command("fixreferrer", async (ctx) => {
     "Now referred by: " + referrer.name + " (" + refCode + ")"
   );
 });
-bot.hears(/^下发(\d+)$/, async (ctx) => {
+bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
   var amount = parseFloat(ctx.match[1]);
 
