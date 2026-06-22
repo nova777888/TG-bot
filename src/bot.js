@@ -124,7 +124,7 @@ bot.command('vip', async (ctx) => {
     '✅ Bound to this chat\n' +
     '👤 ' + customer.name + '\n' +
     '📞 ' + normalized + '\n' +
-    'Now send +1000 or /balance');
+    'Now send 下发1000 or /balance');
 });
 
 // ============================================================
@@ -175,7 +175,7 @@ bot.command('vip', { prefix: '-' }, async (ctx) => {
   await ctx.reply('✅ Unbound ' + customer.name + ' (' + normalized + ') from its chat.');
 });
 
-bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
+bot.hears(/^下发(\d+)$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
   var amount = parseFloat(ctx.match[1]);
 
@@ -222,7 +222,7 @@ bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
     } catch(e) {}
   }
 
-  var reply = '✅ +' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
+  var reply = '✅ 下发' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
 
   // Commission chain: up to 4 levels
   var rates = [0.01, 0.005, 0.003, 0.002];
@@ -263,45 +263,6 @@ bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
   await ctx.reply(reply);
 });
 
-// Also handle 下发X
-bot.hears(/^下发(\d+)$/, async (ctx) => {
-  // Same logic as above - reuse by manually triggering
-  var amount = parseFloat(ctx.match[1]);
-  if (!amount || amount <= 0) return;
-
-  var chatId = String(ctx.chat.id);
-  var { data: customer } = await sb
-    .from('customers')
-    .select('id, name')
-    .eq('telegram_id', chatId)
-    .maybeSingle();
-
-  if (!customer) {
-    await ctx.reply('No customer bound. Use /vip +2348012345678 first.');
-    return;
-  }
-
-  var { data: bal } = await sb
-    .from('customer_balances')
-    .select('*')
-    .eq('customer_id', customer.id)
-    .maybeSingle();
-
-  var newBalance = (bal ? bal.available_balance : 0) + amount;
-
-  if (bal) {
-    await sb.from('customer_balances')
-      .update({ available_balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('id', bal.id);
-  } else {
-    await sb.from('customer_balances')
-      .insert({ customer_id: customer.id, available_balance: amount, total_earned: 0, total_withdrawn: 0 });
-  }
-
-  lastCredit[chatId] = { amount: amount, customer_id: customer.id, prev_balance: bal ? bal.available_balance : 0 };
-
-  await ctx.reply('✅ +' + amount + '\n👤 ' + customer.name + '\n💰 Balance: ' + newBalance);
-});
 
 // ============================================================
 // /撤回 — undo last credit
@@ -428,8 +389,7 @@ bot.command('帮助', async (ctx) => {
     '🤖 Nova Bot Commands\n\n' +
     '/vip +2348012345678 \u2014 Bind VIP customer to this chat\n' +
     '/-vip +2348012345678 \u2014 Unbind VIP from its chat\n' +
-    '+1000 \u2014 Add credit to bound customer\n' +
-    '\u4e0b\u53d11000 \u2014 Same as +1000\n' +
+    '下发1000 \u2014 Add credit to bound customer\n' +
     '/\u64a4\u56de \u2014 Undo last credit\n' +
     '/\u67e5\u8d26 \u2014 Show customer balance\n' +
     '/\u7ed3\u7b97 \u2014 Settle last month commissions\n' +
@@ -443,7 +403,7 @@ bot.command('帮助', async (ctx) => {
 bot.on('message:text', async (ctx) => {
   var text = ctx.message.text.trim();
   // Ignore messages that match commands or +number patterns
-  if (text.startsWith('/') || /^[+＋]?\d+$/.test(text) || /^下发\d+$/.test(text)) return;
+  if (text.startsWith('/') || /^下发\d+$/.test(text)) return;
 
   var chatId = String(ctx.chat.id);
   var { data: customer } = await sb
