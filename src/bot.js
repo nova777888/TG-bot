@@ -548,17 +548,32 @@ bot.command('结算', async (ctx) => {
 // ============================================================
 bot.command('帮助', async (ctx) => {
   await ctx.reply(
-    '🤖 Nova Bot Commands\n\n' +
-    '/vip +2348012345678 \u2014 Bind VIP customer to this chat\n' +
-    '/-vip +2348012345678 \u2014 Unbind VIP from its chat\n' +
-    '下发1000 \u2014 Add credit to bound customer\n' +
-    '/\u64a4\u56de \u2014 Undo last credit\n' +
-    '/\u67e5\u8d26 \u2014 Show customer balance\n' +
-    '/\u7ed3\u7b97 \u2014 Settle last month commissions\n' +
-    '/bindbank \u2014 Bind bank account to this chat\n' +
-    '/fixreferrer \u2014 Fix a customer\'s referrer (admin)'
- +
-    '/\u5e2e\u52a9 \u2014 This help'
+    '🤖 Nova 机器人指令\n\n' +
+    '/vip +2348012345678 \u2014 绑定 VIP 会员到当前聊天窗\n' +
+    '/-vip +2348012345678 \u2014 解除 VIP 会员绑定\n' +
+    '/下发1000 \u2014 给当前客户加账\n' +
+    '/撤回 \u2014 撤销上一次加账\n' +
+    '/查账 \u2014 查看当前客户余额\n' +
+    '/结算 \u2014 结算上月佣金\n' +
+    '/bindbank \u2014 绑定银行账户到当前聊天窗\n' +
+    '/fixreferrer \u2014 修正客户的推荐人（管理员）'
+  );
+});
+
+// ============================================================
+// /指令 \u2014 show all commands (Chinese)
+// ============================================================
+bot.command('指令', async (ctx) => {
+  await ctx.reply(
+    '🤖 Nova 机器人指令\n\n' +
+    '/vip +2348012345678 \u2014 绑定 VIP 会员到当前聊天窗\n' +
+    '/-vip +2348012345678 \u2014 解除 VIP 会员绑定\n' +
+    '/下发1000 \u2014 给当前客户加账\n' +
+    '/撤回 \u2014 撤销上一次加账\n' +
+    '/查账 \u2014 查看当前客户余额\n' +
+    '/结算 \u2014 结算上月佣金\n' +
+    '/bindbank \u2014 绑定银行账户到当前聊天窗\n' +
+    '/fixreferrer \u2014 修正客户的推荐人（管理员）'
   );
 });
 
