@@ -380,7 +380,7 @@ bot.hears(/^下发(\d+)$/, async (ctx) => {
   if (customer.phone_encrypted) {
     try {
       var plain = decryptPhone(customer.phone_encrypted);
-      phoneDisplay = '📱 ' + plain.substring(0, 7) + '****' + plain.substring(plain.length - 4);
+      if (plain) phoneDisplay = '📱 ' + plain;
     } catch(e) {}
   }
 
