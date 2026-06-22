@@ -59,7 +59,7 @@ bot.use(async (ctx, next) => {
 // ============================================================
 // /add +2348012345678 — bind customer to this chat
 // ============================================================
-bot.command('add', async (ctx) => {
+bot.command('vip', async (ctx) => {
   var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
   if (!args) {
     await ctx.reply('Usage: /add +2348012345678');
@@ -114,7 +114,7 @@ bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
     .maybeSingle();
 
   if (!customer) {
-    await ctx.reply('No customer bound. Use /add +2348012345678 first.');
+    await ctx.reply('No customer bound. Use /vip +2348012345678 first.');
     return;
   }
 
@@ -156,7 +156,7 @@ bot.hears(/^下发(\d+)$/, async (ctx) => {
     .maybeSingle();
 
   if (!customer) {
-    await ctx.reply('No customer bound. Use /add +2348012345678 first.');
+    await ctx.reply('No customer bound. Use /vip +2348012345678 first.');
     return;
   }
 
@@ -212,7 +212,7 @@ bot.command('撤回', async (ctx) => {
 // ============================================================
 // /balance — show customer balance
 // ============================================================
-bot.command('balance', async (ctx) => {
+bot.command('查账', async (ctx) => {
   var chatId = String(ctx.chat.id);
 
   var { data: customer } = await sb
@@ -222,7 +222,7 @@ bot.command('balance', async (ctx) => {
     .maybeSingle();
 
   if (!customer) {
-    await ctx.reply('No customer bound. Use /add first.');
+    await ctx.reply('No customer bound. Use /vip first.');
     return;
   }
 
@@ -241,7 +241,7 @@ bot.command('balance', async (ctx) => {
 // ============================================================
 // /settle — settle last month's pending commissions
 // ============================================================
-bot.command('settle', async (ctx) => {
+bot.command('结算', async (ctx) => {
   var now = new Date();
   var monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
   var monthEnd = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -302,7 +302,7 @@ bot.command('settle', async (ctx) => {
 // ============================================================
 // /help
 // ============================================================
-bot.command('help', async (ctx) => {
+bot.command('帮助', async (ctx) => {
   await ctx.reply(
     '🤖 Nova Bot Commands\n\n' +
     '/add +2348012345678 — Bind customer to this chat\n' +
@@ -331,7 +331,7 @@ bot.on('message:text', async (ctx) => {
     .maybeSingle();
 
   if (!customer) {
-    await ctx.reply('Use /add +2348012345678 to bind a customer to this chat.');
+    await ctx.reply('Use /vip +2348012345678 to bind a customer to this chat.');
   }
 });
 
