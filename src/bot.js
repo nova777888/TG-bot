@@ -59,12 +59,12 @@ bot.use(async (ctx, next) => {
 });
 
 // ============================================================
-// /add +2348012345678 — bind customer to this chat
+// /vip +2348012345678 — bind customer to this chat
 // ============================================================
 bot.command('vip', async (ctx) => {
   var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
   if (!args) {
-    await ctx.reply('Usage: /add +2348012345678');
+    await ctx.reply('Usage: /vip +2348012345678');
     return;
   }
 
@@ -83,7 +83,22 @@ bot.command('vip', async (ctx) => {
     return;
   }
 
-  // Clear any existing binding for this chat, then bind
+  // Check if this chat already has a bound customer
+  var { data: existingBound } = await sb
+    .from('customers')
+    .select('id, name')
+    .eq('telegram_id', chatId)
+    .maybeSingle();
+
+  if (existingBound) {
+    await ctx.reply(
+      '⚠️ This chat already has a customer bound: ' + existingBound.name + '\n' +
+      'Use /-vip +234XXXXXXXXX to unbind first, then /vip again.'
+    );
+    return;
+  }
+
+  // Clear old binding if any, then bind new
   await sb.from('customers').update({ telegram_id: null }).eq('telegram_id', chatId);
 
   var { error: updateErr } = await sb
@@ -106,6 +121,51 @@ bot.command('vip', async (ctx) => {
 // ============================================================
 // +1000 or 下发1000 — add credit
 // ============================================================
+// ============================================================
+// /-vip +234XXXXXXXXX — unbind a customer from its chat
+// ============================================================
+bot.command('vip', { prefix: '-' }, async (ctx) => {
+  var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
+  if (!args) {
+    await ctx.reply('Usage: /-vip +2348012345678');
+    return;
+  }
+
+  var normalized = normalizePhone(args);
+  var hash = hashPhone(normalized);
+
+  var { data: customer } = await sb
+    .from('customers')
+    .select('id, name, telegram_id')
+    .eq('phone_hash', hash)
+    .maybeSingle();
+
+  if (!customer) {
+    await ctx.reply('❓ Customer not found with phone ' + normalized);
+    return;
+  }
+
+  if (!customer.telegram_id) {
+    await ctx.reply('⚠️ ' + customer.name + ' has no active binding to unbind.');
+    return;
+  }
+
+  var { error: unbindErr } = await sb
+    .from('customers')
+    .update({ telegram_id: null })
+    .eq('id', customer.id);
+
+  if (unbindErr) {
+    await ctx.reply('❓ Failed to unbind: ' + unbindErr.message);
+    return;
+  }
+
+  var chatId = customer.telegram_id;
+  delete lastCredit[chatId];
+
+  await ctx.reply('✅ Unbound ' + customer.name + ' (' + normalized + ') from its chat.');
+});
+
 bot.hears(/^[+＋]?(\d+)$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
   var amount = parseFloat(ctx.match[1]);
@@ -310,13 +370,14 @@ bot.command('结算', async (ctx) => {
 bot.command('帮助', async (ctx) => {
   await ctx.reply(
     '🤖 Nova Bot Commands\n\n' +
-    '/add +2348012345678 — Bind customer to this chat\n' +
-    '+1000 — Add credit to bound customer\n' +
-    '下发1000 — Same as +1000\n' +
-    '/撤回 — Undo last credit\n' +
-    '/balance — Show customer balance\n' +
-    '/settle — Settle last month commissions\n' +
-    '/help — This help'
+    '/vip +2348012345678 \u2014 Bind VIP customer to this chat\n' +
+    '/-vip +2348012345678 \u2014 Unbind VIP from its chat\n' +
+    '+1000 \u2014 Add credit to bound customer\n' +
+    '\u4e0b\u53d11000 \u2014 Same as +1000\n' +
+    '/\u64a4\u56de \u2014 Undo last credit\n' +
+    '/\u67e5\u8d26 \u2014 Show customer balance\n' +
+    '/\u7ed3\u7b97 \u2014 Settle last month commissions\n' +
+    '/\u5e2e\u52a9 \u2014 This help'
   );
 });
 
