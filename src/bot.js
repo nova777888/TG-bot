@@ -1,6 +1,7 @@
 const { Bot } = require('grammy');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const WebSocket = require('ws');
 
 // ============================================================
 // Configuration
@@ -17,7 +18,8 @@ if (!ADMIN_TG_IDS.length) { console.error('ADMIN_TG_IDS required'); process.exit
 // Supabase client (service role for full access)
 // ============================================================
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false }
+  auth: { autoRefreshToken: false, persistSession: false },
+      realtime: { transport: WebSocket }
 });
 
 // ============================================================
