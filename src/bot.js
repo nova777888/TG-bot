@@ -42,6 +42,46 @@ function hashPhone(phone) {
 // In-memory tracking for undo (last credit per chat)
 // ============================================================
 var lastCredit = {};
+// ============================================================
+// Bank account linking helpers
+// ============================================================
+async function getLinkedCustomerIds(customerId) {
+  var { data: myBanks } = await sb
+    .from("bank_bindings")
+    .select("bank_account")
+    .eq("customer_id", customerId);
+  
+  if (!myBanks || myBanks.length === 0) return [];
+  
+  var bankAccounts = myBanks.map(function(b) { return b.bank_account; });
+  
+  var { data: linked } = await sb
+    .from("bank_bindings")
+    .select("customer_id")
+    .in("bank_account", bankAccounts)
+    .neq("customer_id", customerId);
+  
+  if (!linked) return [];
+  var ids = {};
+  linked.forEach(function(l) { ids[l.customer_id] = true; });
+  return Object.keys(ids);
+}
+
+async function isBankLinkedToReferrer(customerId) {
+  var linkedIds = await getLinkedCustomerIds(customerId);
+  if (linkedIds.length === 0) return null;
+  for (var i = 0; i < linkedIds.length; i++) {
+    var { data: linkedCust } = await sb
+      .from("customers")
+      .select("id, parent_id, name")
+      .eq("id", linkedIds[i])
+      .maybeSingle();
+    if (linkedCust && linkedCust.parent_id) return linkedCust;
+  }
+  return null;
+}
+
+var ENCRYPTION_KEY
 
 var ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '96ad19dd1d302c46aceea0edf9759655090b762f947f81a6107382e9681784a0', 'hex');
 
@@ -175,6 +215,128 @@ bot.command('vip', { prefix: '-' }, async (ctx) => {
   await ctx.reply('✅ Unbound ' + customer.name + ' (' + normalized + ') from its chat.');
 });
 
+
+
+// ============================================================
+// /bindbank BANKACCOUNT — bind bank account to current chat
+// ============================================================
+bot.command("bindbank", async (ctx) => {
+  var args = ctx.message.text.split(" ").slice(1).join(" ").trim();
+  if (!args) {
+    await ctx.reply("Usage: /bindbank 6222021234567890");
+    return;
+  }
+  var chatId = String(ctx.chat.id);
+  var bankAccount = args.replace(/[\s-]/g, "");
+  if (bankAccount.length < 8) {
+    await ctx.reply("Bank account number too short (min 8 digits)");
+    return;
+  }
+  var { data: customer } = await sb
+    .from("customers")
+    .select("id, name, public_id")
+    .eq("telegram_id", chatId)
+    .maybeSingle();
+  if (!customer) {
+    await ctx.reply("No customer bound. Use /vip +2348012345678 first.");
+    return;
+  }
+  var { data: existingBinding } = await sb
+    .from("bank_bindings")
+    .select("customer_id")
+    .eq("bank_account", bankAccount)
+    .maybeSingle();
+  if (existingBinding && existingBinding.customer_id !== customer.id) {
+    var { data: otherCust } = await sb
+      .from("customers")
+      .select("name, public_id")
+      .eq("id", existingBinding.customer_id)
+      .maybeSingle();
+    await ctx.reply(
+      "\u26a0\ufe0f This bank account is already bound to:\n" +
+      "\u272a\ufe0f " + (otherCust ? otherCust.name : "another customer") + "\n" +
+      "\ud83d\udd11 " + (otherCust ? otherCust.public_id : "Unknown") + "\n\n" +
+      "Both accounts are now linked as the same person."
+    );
+  }
+  if (existingBinding && existingBinding.customer_id === customer.id) {
+    await ctx.reply("This bank account is already bound to " + customer.name);
+    return;
+  }
+  var { error: bindErr } = await sb
+    .from("bank_bindings")
+    .upsert(
+      { bank_account: bankAccount, customer_id: customer.id },
+      { onConflict: "bank_account" }
+    );
+  if (bindErr) {
+    await ctx.reply("Failed to bind: " + bindErr.message);
+    return;
+  }
+  await ctx.reply(
+    "\u2705 Bank account bound\n" +
+    "\u272a\ufe0f " + customer.name + "\n" +
+    "\ud83c\udfe6 " + bankAccount.substring(0, 4) + "****" + bankAccount.substring(bankAccount.length - 4)
+  );
+});
+
+
+// ============================================================
+// /fixreferrer +234XXX VIP00000 \u2014 fix a customer\'s referrer (admin)
+// ============================================================
+bot.command("fixreferrer", async (ctx) => {
+  var parts = ctx.message.text.split(" ").slice(1);
+  if (parts.length < 2) {
+    await ctx.reply("Usage: /fixreferrer +2348012345678 VIP38420");
+    return;
+  }
+  var normalized = normalizePhone(parts[0]);
+  var hash = hashPhone(normalized);
+  var refCode = parts[1].toUpperCase();
+  var { data: customer } = await sb
+    .from("customers")
+    .select("id, name, public_id, parent_id, referrer_locked")
+    .eq("phone_hash", hash)
+    .maybeSingle();
+  if (!customer) {
+    await ctx.reply("Customer not found with phone " + normalized);
+    return;
+  }
+  var { data: referrer } = await sb
+    .from("customers")
+    .select("id, name, public_id")
+    .eq("public_id", refCode)
+    .maybeSingle();
+  if (!referrer) {
+    await ctx.reply("Referrer ID not found: " + refCode);
+    return;
+  }
+  if (referrer.id === customer.id) {
+    await ctx.reply("Cannot set self as referrer");
+    return;
+  }
+  var linkedIds = await getLinkedCustomerIds(customer.id);
+  if (linkedIds.includes(referrer.id)) {
+    await ctx.reply(
+      "\u26a0\ufe0f " + customer.name + " and " + referrer.name + " share bank accounts!\r\n" +
+      "They are the same person. Cannot set as referrer."
+    );
+    return;
+  }
+  var { error: updateErr } = await sb
+    .from("customers")
+    .update({ parent_id: referrer.id, referrer_locked: true })
+    .eq("id", customer.id);
+  if (updateErr) {
+    await ctx.reply("Failed: " + updateErr.message);
+    return;
+  }
+  await ctx.reply(
+    "\u2705 Referrer corrected\r\n" +
+    "\u272a\ufe0f " + customer.name + " (" + normalized + ")\r\n" +
+    "Now referred by: " + referrer.name + " (" + refCode + ")"
+  );
+});
 bot.hears(/^下发(\d+)$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
   var amount = parseFloat(ctx.match[1]);
@@ -393,6 +555,9 @@ bot.command('帮助', async (ctx) => {
     '/\u64a4\u56de \u2014 Undo last credit\n' +
     '/\u67e5\u8d26 \u2014 Show customer balance\n' +
     '/\u7ed3\u7b97 \u2014 Settle last month commissions\n' +
+    '/bindbank \u2014 Bind bank account to this chat\n' +
+    '/fixreferrer \u2014 Fix a customer\'s referrer (admin)'
+ +
     '/\u5e2e\u52a9 \u2014 This help'
   );
 });
