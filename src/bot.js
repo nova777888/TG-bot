@@ -600,10 +600,12 @@ bot.on('message:text', async (ctx) => {
 // ============================================================
 // Start polling (for Railway long-running process)
 // ============================================================
-// Clear any existing webhook/polling before starting
-bot.api.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-bot.start({
-  onStart: function(info) {
-    console.log('🤖 Nova Bot started as @' + (info.username || 'unknown'));
-  }
-});
+// Clear webhook then start
+(async () => {
+  await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+  bot.start({
+    onStart: function(info) {
+      console.log('🤖 Nova Bot started as @' + (info.username || 'unknown'));
+    }
+  });
+})();
