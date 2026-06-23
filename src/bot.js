@@ -83,6 +83,32 @@ async function isBankLinkedToReferrer(customerId) {
 
 
 
+
+// ============================================================
+// Commission helper: ensure a bank account + tx exist for commission chain
+// ============================================================
+const SYSTEM_BANK_ID = "00000000-0000-0000-0000-000000000999";
+
+async function ensureSystemBankAccount() {
+  var { data: existing } = await sb
+    .from("bank_accounts")
+    .select("id")
+    .eq("id", SYSTEM_BANK_ID)
+    .maybeSingle();
+  if (existing) return SYSTEM_BANK_ID;
+  var { error } = await sb.from("bank_accounts").insert({
+    id: SYSTEM_BANK_ID,
+    account_number_encrypted: "system",
+    account_number_hash: "system",
+    owner_customer_id: "00000000-0000-0000-0000-000000000000"
+  });
+  if (error) console.error("[COMMISSION] Failed to create system bank:", error.message);
+  return SYSTEM_BANK_ID;
+}
+
+function getMonthStr(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
 var ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '96ad19dd1d302c46aceea0edf9759655090b762f947f81a6107382e9681784a0', 'hex');
 
 function decryptPhone(encrypted) {
@@ -415,12 +441,26 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
 
     var commissionAmt = Math.round(amount * rates[level] * 100) / 100;
     if (commissionAmt > 0) {
+      // Create transaction for commission chain
+      var bankId = await ensureSystemBankAccount();
+      var txId = crypto.randomUUID();
+      await sb.from('transactions').insert({
+        id: txId,
+        customer_id: customer.id,
+        bank_account_id: bankId,
+        amount: amount,
+        trade_date: new Date().toISOString()
+      }).catch(function(e) { console.error('[COMM] TX error:', e.message); });
       await sb.from('commissions').insert({
-        referrer_id: parent.id,
-        amount: commissionAmt,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      });
+        customer_id: parent.id,
+        from_customer_id: customer.id,
+        from_transaction_id: txId,
+        amount: amount,
+        rate: rates[level],
+        commission: commissionAmt,
+        month: getMonthStr(new Date()),
+        settled: false
+      }).catch(function(e) { console.error('[COMM] Insert error:', e.message); });
       commissionParts.push('  ' + levelNames[level] + ' (' + (rates[level] * 100) + '%): +' + commissionAmt.toFixed(2));
     }
     currentParentId = parent.parent_id;
@@ -502,10 +542,9 @@ bot.hears(/^\/?结算(?:@\w+)?$/, async (ctx) => {
 
   var { data: pending, error: fetchErr } = await sb
     .from('commissions')
-    .select('id, amount, referrer_id')
-    .eq('status', 'pending')
-    .gte('created_at', monthStart)
-    .lt('created_at', monthEnd);
+    .select('id, commission, customer_id')
+    .eq('settled', false)
+    .eq('month', lastMonth);
 
   if (fetchErr) {
     await ctx.reply('❌ Failed to query commissions: ' + fetchErr.message);
@@ -521,7 +560,7 @@ bot.hears(/^\/?结算(?:@\w+)?$/, async (ctx) => {
   var ids = pending.map(function(r) { return r.id; });
   var { error: updateErr } = await sb
     .from('commissions')
-    .update({ status: 'settled' })
+    .update({ settled: true, settled_at: new Date().toISOString() })
     .in('id', ids);
 
   if (updateErr) {
@@ -532,7 +571,7 @@ bot.hears(/^\/?结算(?:@\w+)?$/, async (ctx) => {
   // Update customer_balances.total_earned for each referrer
   var referrerTotals = {};
   pending.forEach(function(c) {
-    referrerTotals[c.referrer_id] = (referrerTotals[c.referrer_id] || 0) + c.amount;
+    referrerTotals[c.customer_id] = (referrerTotals[c.customer_id] || 0) + c.commission;
   });
 
   for (var refId in referrerTotals) {
