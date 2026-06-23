@@ -98,12 +98,6 @@ function decryptPhone(encrypted) {
 var bot = new Bot(TELEGRAM_BOT_TOKEN);
 
 // Auth: only admin can use this bot
-// Diagnostic: log every incoming message
-bot.use(async (ctx, next) => {
-  console.log("[DIAG] Received from " + ctx.from?.id + ": " + (ctx.message?.text || ""));
-  await next();
-});
-
 bot.use(async (ctx, next) => {
   var userId = ctx.from && ctx.from.id;
   if (!ADMIN_TG_IDS.includes(userId)) {
@@ -116,11 +110,6 @@ bot.use(async (ctx, next) => {
 // ============================================================
 // /vip +2348012345678 — bind customer to this chat
 // ============================================================
-bot.command('ping', async (ctx) => {
-  await ctx.reply('pong! Bot is alive @' + Date.now());
-  console.log('[DIAG] /ping responded');
-});
-
 bot.command('vip', async (ctx) => {
   var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
   if (!args) {
@@ -611,10 +600,11 @@ bot.on('message:text', async (ctx) => {
 // ============================================================
 // Start polling (for Railway long-running process)
 // ============================================================
+// Clear webhook then start
 (async () => {
   // Forcefully reset any existing polling sessions
   await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-  // Close any stale getUpdates sessions by calling with a negative offset
+  // Close any stale getUpdates sessions
   await bot.api.getUpdates({ offset: -1, timeout: 1 }).catch(() => {});
   await bot.api.getUpdates({ offset: -2, timeout: 1 }).catch(() => {});
   bot.start({
