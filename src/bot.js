@@ -444,14 +444,14 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
       // Create transaction for commission chain
       var bankId = await ensureSystemBankAccount();
       var txId = crypto.randomUUID();
-      await sb.from('transactions').insert({
+      try { await sb.from('transactions').insert({
         id: txId,
         customer_id: customer.id,
         bank_account_id: bankId,
         amount: amount,
         trade_date: new Date().toISOString()
-      }).catch(function(e) { console.error('[COMM] TX error:', e.message); });
-      await sb.from('commissions').insert({
+      }); } catch(e) { console.error('[COMM] TX error:', e.message); }
+      try { await sb.from('commissions').insert({
         customer_id: parent.id,
         from_customer_id: customer.id,
         from_transaction_id: txId,
@@ -460,7 +460,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
         commission: commissionAmt,
         month: getMonthStr(new Date()),
         settled: false
-      }).catch(function(e) { console.error('[COMM] Insert error:', e.message); });
+      }); } catch(e) { console.error('[COMM] Insert error:', e.message); }
       commissionParts.push('  ' + levelNames[level] + ' (' + (rates[level] * 100) + '%): +' + commissionAmt.toFixed(2));
     }
     currentParentId = parent.parent_id;
