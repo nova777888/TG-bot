@@ -98,6 +98,12 @@ function decryptPhone(encrypted) {
 var bot = new Bot(TELEGRAM_BOT_TOKEN);
 
 // Auth: only admin can use this bot
+// Diagnostic: log every incoming message
+bot.use(async (ctx, next) => {
+  console.log("[DIAG] Received from " + ctx.from?.id + ": " + (ctx.message?.text || ""));
+  await next();
+});
+
 bot.use(async (ctx, next) => {
   var userId = ctx.from && ctx.from.id;
   if (!ADMIN_TG_IDS.includes(userId)) {
@@ -110,6 +116,11 @@ bot.use(async (ctx, next) => {
 // ============================================================
 // /vip +2348012345678 — bind customer to this chat
 // ============================================================
+bot.command('ping', async (ctx) => {
+  await ctx.reply('pong! Bot is alive @' + Date.now());
+  console.log('[DIAG] /ping responded');
+});
+
 bot.command('vip', async (ctx) => {
   var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
   if (!args) {
