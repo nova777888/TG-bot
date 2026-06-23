@@ -116,11 +116,11 @@ bot.use(async (ctx, next) => {
 // /vip +2348012345678 — bind customer to this chat
 // ============================================================
 // Simple ping test
-bot.command('ping', async (ctx) => {
+bot.hears(/^\/?ping(?:@\w+)?$/, async (ctx) => {
   await ctx.reply('pong!');
 });
 
-bot.command('vip', async (ctx) => {
+bot.hears(/^\/?vip(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
   var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
   if (!args) {
     await ctx.reply('Usage: /vip +2348012345678');
@@ -183,7 +183,7 @@ bot.command('vip', async (ctx) => {
 // ============================================================
 // /-vip +234XXXXXXXXX — unbind a customer from its chat
 // ============================================================
-bot.command('vip', { prefix: '-' }, async (ctx) => {
+bot.hears(/^\/?-vip(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
   var args = ctx.message.text.split(' ').slice(1).join(' ').trim();
   if (!args) {
     await ctx.reply('Usage: /-vip +2348012345678');
@@ -230,7 +230,7 @@ bot.command('vip', { prefix: '-' }, async (ctx) => {
 // ============================================================
 // /bindbank BANKACCOUNT — bind bank account to current chat
 // ============================================================
-bot.command("bindbank", async (ctx) => {
+bot.hears(/^\/?bindbank(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
   var args = ctx.message.text.split(" ").slice(1).join(" ").trim();
   if (!args) {
     await ctx.reply("Usage: /bindbank 6222021234567890");
@@ -294,7 +294,7 @@ bot.command("bindbank", async (ctx) => {
 // ============================================================
 // /fixreferrer +234XXX VIP00000 \u2014 fix a customer\'s referrer (admin)
 // ============================================================
-bot.command("fixreferrer", async (ctx) => {
+bot.hears(/^\/?fixreferrer(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
   var parts = ctx.message.text.split(" ").slice(1);
   if (parts.length < 2) {
     await ctx.reply("Usage: /fixreferrer +2348012345678 VIP38420");
@@ -439,7 +439,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
 // ============================================================
 // /撤回 — undo last credit
 // ============================================================
-bot.command('撤回', async (ctx) => {
+bot.hears(/^\/?撤回(?:@\w+)?$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
   var last = lastCredit[chatId];
 
@@ -466,7 +466,7 @@ bot.command('撤回', async (ctx) => {
 // ============================================================
 // /balance — show customer balance
 // ============================================================
-bot.command('查账', async (ctx) => {
+bot.hears(/^\/?查账(?:@\w+)?$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
 
   var { data: customer } = await sb
@@ -495,7 +495,7 @@ bot.command('查账', async (ctx) => {
 // ============================================================
 // /settle — settle last month's pending commissions
 // ============================================================
-bot.command('结算', async (ctx) => {
+bot.hears(/^\/?结算(?:@\w+)?$/, async (ctx) => {
   var now = new Date();
   var monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
   var monthEnd = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -556,7 +556,7 @@ bot.command('结算', async (ctx) => {
 // ============================================================
 // /help
 // ============================================================
-bot.command('帮助', async (ctx) => {
+bot.hears(/^\/?帮助(?:@\w+)?$/, async (ctx) => {
   await ctx.reply(
     '🤖 Nova 机器人指令\n\n' +
     '/vip +2348012345678 \u2014 绑定 VIP 会员到当前聊天窗\n' +
@@ -573,7 +573,7 @@ bot.command('帮助', async (ctx) => {
 // ============================================================
 // /指令 \u2014 show all commands (Chinese)
 // ============================================================
-bot.command('指令', async (ctx) => {
+bot.hears(/^\/?指令(?:@\w+)?$/, async (ctx) => {
   await ctx.reply(
     '🤖 Nova 机器人指令\n\n' +
     '/vip +2348012345678 \u2014 绑定 VIP 会员到当前聊天窗\n' +
