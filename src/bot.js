@@ -611,9 +611,12 @@ bot.on('message:text', async (ctx) => {
 // ============================================================
 // Start polling (for Railway long-running process)
 // ============================================================
-// Clear webhook then start
 (async () => {
+  // Forcefully reset any existing polling sessions
   await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
+  // Close any stale getUpdates sessions by calling with a negative offset
+  await bot.api.getUpdates({ offset: -1, timeout: 1 }).catch(() => {});
+  await bot.api.getUpdates({ offset: -2, timeout: 1 }).catch(() => {});
   bot.start({
     onStart: function(info) {
       console.log('🤖 Nova Bot started as @' + (info.username || 'unknown'));
