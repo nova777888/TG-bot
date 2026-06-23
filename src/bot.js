@@ -422,6 +422,17 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
 
   var reply = '✅ 下发' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
 
+    // Always create a transaction record
+  var bankId = await ensureSystemBankAccount();
+  var txId = crypto.randomUUID();
+  try { await sb.from('transactions').insert({
+    id: txId,
+    customer_id: customer.id,
+    bank_account_id: bankId,
+    amount: amount,
+    trade_date: new Date().toISOString()
+  }); } catch(e) { console.error('[TX] Insert error:', e.message); }
+
   // Commission chain: up to 4 levels
   var rates = [0.01, 0.005, 0.003, 0.002];
   var levelNames = ['直推', 'FF', 'FFF', 'Member'];
@@ -441,16 +452,6 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
 
     var commissionAmt = Math.round(amount * rates[level] * 100) / 100;
     if (commissionAmt > 0) {
-      // Create transaction for commission chain
-      var bankId = await ensureSystemBankAccount();
-      var txId = crypto.randomUUID();
-      try { await sb.from('transactions').insert({
-        id: txId,
-        customer_id: customer.id,
-        bank_account_id: bankId,
-        amount: amount,
-        trade_date: new Date().toISOString()
-      }); } catch(e) { console.error('[COMM] TX error:', e.message); }
       try { await sb.from('commissions').insert({
         customer_id: parent.id,
         from_customer_id: customer.id,
@@ -464,9 +465,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
       commissionParts.push('  ' + levelNames[level] + ' (' + (rates[level] * 100) + '%): +' + commissionAmt.toFixed(2));
     }
     currentParentId = parent.parent_id;
-  }
-
-  if (commissionParts.length > 0) {
+  }if (commissionParts.length > 0) {
     reply += '\n━━━━━━━━━━━━━━━━\n🏆 推荐佣金\n' + commissionParts.join('\n');
   }
 
