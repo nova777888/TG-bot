@@ -742,14 +742,14 @@ bot.use(async (ctx, next) => {
 
             // Build table with double-space separators
     var out = [];
-    var hdr1 = 'VIPID'.padEnd(25) + '  ' + '日期'.padEnd(20) + '  ' + '总佣金'.padStart(5) + '  ' + '预支'.padStart(8) + '  ' + '应付金额';
+    var hdr1 = 'VIPID'.padEnd(12) + '  ' + '日期'.padEnd(22) + '  ' + '总佣金'.padStart(10) + '  ' + '预支'.padStart(8) + '  ' + '应付金额';
     out.push(hdr1);
     for (var ri = 0; ri < rows.length; ri++) {
       var vipD = cust.public_id.padEnd(12);
       var dateD = rows[ri].ts.padEnd(22);
-      var commD = String(totalComm).padStart(5);
+      var commD = String(totalComm).padStart(10);
       var advD = String(rows[ri].amt).padStart(8);
-      var payD = String(rows[ri].pay);.padStart(8);
+      var payD = String(rows[ri].pay);
       out.push(vipD + '  ' + dateD + '  ' + commD + '  ' + advD + '  ' + payD);
     }
     await ctx.reply(out.join('\n'));
@@ -828,16 +828,16 @@ bot.use(async (ctx, next) => {
   if (cmd === '帮助' || cmd === '指令') {
     await ctx.reply(
       '🤖 Nova 机器人指令\n\n' +
-      '/vip       — 绑定 VIP 会员到当前聊天窗\n' +
-      '/-vip      — 解除 VIP 会员绑定\n' +
-      '/下发       — 给当前客户加账\n' +
-      '/撤回       — 撤销上一次加账\n' +
-      '/查账       — 查看近 6 个月佣金状态 (含预支)\n' +
-      '/佣金       — 查看本月赚取佣金总数\n' +
-      '/预支       — 创建预支记录并从佣金扣除\n' +
-      '/预支查询    — 查看预支记录及应付金额\n' +
-      '/结算       — 结算指定月份佣金\n' +
-      '/bindbank  — 绑定银行账户到当前聊天窗\n' +
+      '/vip +2348012345678 — 绑定 VIP 会员到当前聊天窗\n' +
+      '/-vip +2348012345678 — 解除 VIP 会员绑定\n' +
+      '/下发1000 — 给当前客户加账\n' +
+      '/撤回 — 撤销上一次加账\n' +
+      '/查账 — 查看近 6 个月佣金状态 (含预支)\n' +
+      '/佣金 — 查看本月赚取佣金总数\n' +
+      '/预支 — 创建预支记录并从佣金扣除\n' +
+      '/预支查询 — 查看预支记录及应付金额\n' +
+      '/结算 2026-5月 — 结算指定月份佣金\n' +
+      '/bindbank — 绑定银行账户到当前聊天窗\n' +
       '/fixreferrer — 修正客户的推荐人（管理员）'
     );
     return;
