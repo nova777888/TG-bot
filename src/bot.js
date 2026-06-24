@@ -740,25 +740,24 @@ bot.use(async (ctx, next) => {
     // Display newest first
     rows.reverse();
 
-            // Pad each column for alignment
-    
-    var idPad = 'ID'.padEnd(12);
-    var datePadH = '日期'.padEnd(22);
-    var commPadH = '总佣金'.padStart(8);
-    var advPadH = '预支'.padStart(8);
-    var payH = '应付金额';
-    var hdr1 = idPad + datePadH + commPadH + advPadH + '  ' + payH;
-    var out = [hdr1];
-    var fmtRow = function(ts, comm, adv, cum, pay) {
-      var datePad = ts.padEnd(22);
-      var commPad = String(comm).padStart(8);
-      var advPad = String(adv).padStart(8);
-      var formula = String(comm) + '-' + String(cum) + '=' + String(pay);
-      return cust.public_id.padEnd(12) + datePad + commPad + advPad + '  ' + formula;
-    };
-    // Progressive running sum for each row (newest first display)
+            // Build pipe-delimited table for alignment
+    var sep = ' | ';
+    var vipH = 'VIPID'.padEnd(12);
+    var dateH = '日期'.padEnd(22);
+    var commH = '总佣金'.padStart(10);
+    var advH = '预支'.padStart(8);
+    var payH = '应付金额'.padEnd(22);
+    var hdr1 = vipH + sep + dateH + sep + commH + sep + advH + sep + payH;
+    var dash = ''.padEnd(hdr1.length, '─');
+    var out = [hdr1, dash];
     for (var ri = 0; ri < rows.length; ri++) {
-      out.push(fmtRow(rows[ri].ts, totalComm, rows[ri].amt, rows[ri].cum, rows[ri].pay));
+      var vipD = cust.public_id.padEnd(12);
+      var dateD = rows[ri].ts.padEnd(22);
+      var commD = String(totalComm).padStart(10);
+      var advD = String(rows[ri].amt).padStart(8);
+      var formula = String(totalComm) + '-' + String(rows[ri].cum) + '=' + String(rows[ri].pay);
+      var payD = formula.padEnd(22);
+      out.push(vipD + sep + dateD + sep + commD + sep + advD + sep + payD);
     }
     await ctx.reply(out.join('\n'));
     return;
