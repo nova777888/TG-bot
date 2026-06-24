@@ -666,7 +666,13 @@ bot.use(async (ctx, next) => {
       var amtPayable = totalComm - advTotal;
       var amtStr = '₦' + amtPayable.toFixed(2);
 
-      lines_out.push(cust.public_id + '  ' + label + '  ' + amtStr + '  ' + state + '  ' + advanceYesNo);
+      var hdr = '--VIPID' + '        ' + 'Date' + '       ' + 'Amount' + '           ' + 'State' + '       ' + 'Advance amount';
+      if (mi2 === 0) lines_out.push(hdr);
+      var vipD = cust.public_id.padEnd(13);
+      var dateD = label.padEnd(11);
+      var amtD = amtStr.padStart(10);
+      var stateD = state.padEnd(12);
+      lines_out.push('  ' + vipD + dateD + amtD + '  ' + stateD + '             ' + advanceYesNo);
     }
 
     lines_out.push('\n⚠️ The commission for the current month cannot be settled and must wait until the next month for settlement.');
@@ -1105,6 +1111,7 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
 
