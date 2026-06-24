@@ -902,7 +902,8 @@ bot.use(async (ctx, next) => {
       await ctx.reply('Usage: /添加管理 +2348012345678');
       return;
     }
-    var phone = normalizePhone(parts[1]);
+    var phoneRaw = parts.slice(1).join('');
+    var phone = normalizePhone(phoneRaw);
     var ph = hashPhone(phone);
     var { data: cust } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
     if (!cust) {
@@ -944,7 +945,8 @@ bot.use(async (ctx, next) => {
       await ctx.reply('Usage: /删除管理 +2348012345678');
       return;
     }
-    var phone = normalizePhone(parts[1]);
+    var phoneRaw = parts.slice(1).join('');
+    var phone = normalizePhone(phoneRaw);
     var ph = hashPhone(phone);
     var { data: cust } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
     if (!cust) {
@@ -1065,6 +1067,8 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
+
 
 
 
