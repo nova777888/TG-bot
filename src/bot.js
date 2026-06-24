@@ -889,7 +889,7 @@ bot.on('message:text', async (ctx) => {
       });
       return; // success
     } catch (e) {
-      if (e.message && e.message.indexOf('409') >= 0) {
+      if (e.error_code === 409 || (e.message && e.message.indexOf('409') >= 0)) {
         console.log('409 conflict, retrying in 3s (attempt ' + (attempt+1) + '/' + maxRetries + ')');
         await new Promise(function(r) { setTimeout(r, 3000); });
       } else {
