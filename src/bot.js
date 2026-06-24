@@ -517,44 +517,115 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // --- /查账 — show customer balance ---
+  // --- /查账 — show 6-month commission status ---
   if (cmd === '查账') {
     var chatId = String(ctx.chat.id);
 
-    var { data: customer } = await sb
+    var { data: cust } = await sb
       .from('customers')
       .select('id, name, public_id')
       .eq('telegram_id', chatId)
       .maybeSingle();
 
-    if (!customer) {
+    if (!cust) {
       await ctx.reply('No customer bound. Use /vip first.');
       return;
     }
 
-    var { data: bal } = await sb
-      .from('customer_balances')
-      .select('*')
-      .eq('customer_id', customer.id)
-      .maybeSingle();
+    // Generate last 6 months
+    var now = new Date();
+    var months = [];
+    for (var mi = 0; mi < 6; mi++) {
+      var d = new Date(now.getFullYear(), now.getMonth() - mi, 1);
+      months.push(getMonthStr(d));
+    }
 
-    var balance = bal ? bal.available_balance : 0;
-    var earned = bal ? bal.total_earned : 0;
+    // Query commissions for each month
+    var lines_out = [];
+    lines_out.push('📋 Commission Status\n');
+    for (var mi2 = 0; mi2 < months.length; mi2++) {
+      var m = months[mi2];
+      var { data: comms } = await sb
+        .from('commissions')
+        .select('commission, settled')
+        .eq('customer_id', cust.id)
+        .eq('month', m);
+      var totalComm = 0;
+      var allSettled = true;
+      if (comms && comms.length > 0) {
+        for (var ci = 0; ci < comms.length; ci++) {
+          totalComm += comms[ci].commission;
+          if (!comms[ci].settled) allSettled = false;
+        }
+      }
+      // Format: 2026-05月   Settled/Unsettled   Amount
+      var y = m.substring(0, 4);
+      var mo = parseInt(m.substring(5, 7), 10);
+      var label = y + '-' + mo + '月';
+      var status = allSettled ? '✅ Settled' : (comms && comms.length > 0 ? '⏳ Unsettled' : '—');
+      var amtStr = totalComm > 0 ? totalComm.toFixed(2) : '0.00';
+      lines_out.push(label + '  ' + status + '  ₦' + amtStr);
+    }
 
-    await ctx.reply('💰 ' + customer.name + '\n🔑 ' + (customer.public_id || 'N/A') + '\nAvailable: ' + balance + '\nTotal Earned: ' + earned);
+    await ctx.reply(lines_out.join('\n'));
     return;
   }
 
-  // --- /结算 — settle last month's pending commissions ---
-  if (cmd === '结算') {
-    var now = new Date();
-    var lastMonth = getMonthStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  // --- /佣金 — show this month's total commission earned ---
+  if (cmd === '佣金') {
+    var chatId = String(ctx.chat.id);
+
+    var { data: cust } = await sb
+      .from('customers')
+      .select('id, name, public_id')
+      .eq('telegram_id', chatId)
+      .maybeSingle();
+
+    if (!cust) {
+      await ctx.reply('No customer bound. Use /vip first.');
+      return;
+    }
+
+    var thisMonth = getMonthStr(new Date());
+    var { data: comms } = await sb
+      .from('commissions')
+      .select('commission')
+      .eq('customer_id', cust.id)
+      .eq('month', thisMonth);
+
+    var total = 0;
+    if (comms) {
+      for (var ci2 = 0; ci2 < comms.length; ci2++) {
+        total += comms[ci2].commission;
+      }
+    }
+
+    await ctx.reply('💰 This month commission: ₦' + total.toFixed(2));
+
+
+
+  // --- /结算 — settle commissions for a specified month (e.g. /结算 2026-5月) ---
+  if (cmd.startsWith('结算')) {
+    // Parse month parameter: /结算 2026-5月
+    var parts = text.replace(/^\/+/, '').replace(/@\w+$/, '').split(/\s+/);
+    var targetMonth = null;
+    if (parts.length >= 2 && parts[1]) {
+      var match = parts[1].match(/^(\d{4})\s*[-年]\s*(\d{1,2})\s*月?$/);
+      if (match) {
+        targetMonth = match[1] + '-' + String(parseInt(match[2])).padStart(2, '0');
+      }
+    }
+
+    if (!targetMonth) {
+      await ctx.reply('Please specify a month, e.g.: /结算 2026-5月');
+      return;
+    }
 
     var { data: pending, error: fetchErr } = await sb
       .from('commissions')
       .select('id, commission, customer_id')
       .eq('settled', false)
-      .eq('month', lastMonth);
+      .eq('month', targetMonth);
 
     if (fetchErr) {
       await ctx.reply('❌ Failed to query commissions: ' + fetchErr.message);
@@ -562,7 +633,7 @@ bot.use(async (ctx, next) => {
     }
 
     if (!pending || pending.length === 0) {
-      await ctx.reply('No pending commissions for last month.');
+      await ctx.reply('No pending commissions for ' + targetMonth);
       return;
     }
 
@@ -577,6 +648,7 @@ bot.use(async (ctx, next) => {
       return;
     }
 
+    // Update customer_balances.total_earned
     var referrerTotals = {};
     pending.forEach(function(c) {
       referrerTotals[c.customer_id] = (referrerTotals[c.customer_id] || 0) + c.commission;
@@ -598,7 +670,7 @@ bot.use(async (ctx, next) => {
       }
     }
 
-    await ctx.reply('✅ Settled ' + pending.length + ' commissions for last month');
+    await ctx.reply('✅ Settled ' + pending.length + ' commissions for ' + targetMonth);
     return;
   }
 
@@ -610,8 +682,9 @@ bot.use(async (ctx, next) => {
       '/-vip +2348012345678 — 解除 VIP 会员绑定\n' +
       '/下发1000 — 给当前客户加账\n' +
       '/撤回 — 撤销上一次加账\n' +
-      '/查账 — 查看当前客户余额\n' +
-      '/结算 — 结算上月佣金\n' +
+      '/查账 — 查看近 6 个月佣金状态\n' +
+      '/佣金 — 查看本月赚取佣金总数\n' +
+      '/结算 2026-5月 — 结算指定月份佣金\n' +
       '/bindbank — 绑定银行账户到当前聊天窗\n' +
       '/fixreferrer — 修正客户的推荐人（管理员）'
     );
