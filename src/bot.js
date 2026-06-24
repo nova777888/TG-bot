@@ -541,7 +541,21 @@ bot.hears(/^\/?下发\s*(\d+)$/, async (ctx) => {
       totalMonthComm += monthComms[mc].commission;
     }
   }
-  reply += '\n💰️ commission: ₦' + totalMonthComm.toFixed(2);
+  // Subtract advances for this month
+  var { data: advs_2 } = await sb
+    .from('transactions')
+    .select('amount')
+    .eq('customer_id', customer.id)
+    .eq('source', 'advance')
+    .gte('created_at', thisMonth + '-01')
+    .lt('created_at', getMonthStr(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) + '-01');
+  var advTotal2 = 0;
+  if (advs_2) {
+    for (var a2 = 0; a2 < advs_2.length; a2++) advTotal2 += advs_2[a2].amount;
+  }
+  var netComm = totalMonthComm - advTotal2;
+  if (netComm < 0) netComm = 0;
+  reply += '\n💰️ commission: ₦' + netComm.toFixed(2);
   if (commissionParts.length > 0) {
     reply += '\n━━━━━━━━━━━━━━━━\n🏆 Referral Commission\n' + commissionParts.join('\n');
   }
@@ -666,12 +680,12 @@ bot.use(async (ctx, next) => {
       var amtPayable = totalComm - advTotal;
       var amtStr = '₦' + amtPayable.toFixed(2);
 
-      var hdr = '--VIPID' + '        ' + 'Date' + '       ' + 'Amount' + '           ' + 'State' + '       ' + 'Advance amount';
+      var hdr = '--VIPID' + '               ' + 'Date' + '          ' + 'Amount' + '                   ' + 'State' + '       ' + 'Advance amount';
       if (mi2 === 0) lines_out.push(hdr);
-      var vipD = cust.public_id.padEnd(13);
-      var dateD = label.padEnd(11);
+      var vipD = cust.public_id.padEnd(20);
+      var dateD = label.padEnd(14);
       var amtD = amtStr.padStart(10);
-      lines_out.push('  ' + vipD + dateD + amtD + ''.padEnd(7) + state + '             ' + advanceYesNo);
+      lines_out.push('  ' + vipD + dateD + amtD + ''.padEnd(15) + state + '             ' + advanceYesNo);
     }
 
     lines_out.push('\n⚠️ The commission for the current month cannot be settled and must wait until the next month for settlement.');
