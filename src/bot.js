@@ -671,8 +671,7 @@ bot.use(async (ctx, next) => {
       var vipD = cust.public_id.padEnd(13);
       var dateD = label.padEnd(11);
       var amtD = amtStr.padStart(10);
-      var stateD = state.padEnd(12);
-      lines_out.push('  ' + vipD + dateD + amtD + '  ' + stateD + '             ' + advanceYesNo);
+      lines_out.push('  ' + vipD + dateD + amtD + ''.padEnd(7) + state + '             ' + advanceYesNo);
     }
 
     lines_out.push('\n⚠️ The commission for the current month cannot be settled and must wait until the next month for settlement.');
@@ -1111,6 +1110,7 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
 
