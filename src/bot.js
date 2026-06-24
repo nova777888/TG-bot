@@ -426,7 +426,7 @@ bot.hears(/^\/?fixreferrer(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
     "Now referred by: " + referrer.name + " (" + refCode + ")"
   );
 });
-bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
+bot.hears(/^\/?下发\s*(\d+)$/, async (ctx) => {
   var chatId = String(ctx.chat.id);
   var amount = parseFloat(ctx.match[1]);
 
@@ -559,7 +559,7 @@ bot.use(async (ctx, next) => {
   var cmd = text.replace(/^\/+/, '').replace(/@\w+$/, '');
 
   // 下发 is handled by its own hears handler below
-  if (/^下发\d+$/.test(cmd)) return next();
+  if (/^下发\s*\d+$/.test(cmd)) return next();
 
   // --- /撤回 — undo last credit ---
   if (cmd === '撤回') {
@@ -1015,7 +1015,7 @@ bot.use(async (ctx, next) => {
 bot.on('message:text', async (ctx) => {
   var text = ctx.message.text.trim();
   // Ignore messages that match commands or +number patterns
-  if (text.startsWith('/') || /^下发\d+$/.test(text)) return;
+  if (text.startsWith('/') || /^下发\s*\d+$/.test(text)) return;
 
   var chatId = String(ctx.chat.id);
   var { data: customer } = await sb
@@ -1065,6 +1065,7 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
 
