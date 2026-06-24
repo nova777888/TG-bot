@@ -877,15 +877,15 @@ bot.use(async (ctx, next) => {
   }
 
   
-  // --- /addadmin — add a sub-admin ---
-  if (cmd === 'addadmin' || cmd.startsWith('addadmin ')) {
+  // --- /添加管理 — add a sub-admin ---
+  if (cmd === '添加管理' || cmd.startsWith('添加管理 ')) {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
       return;
     }
     var parts = text.split(/\s+/);
     if (parts.length < 2) {
-      await ctx.reply('Usage: /addadmin +2348012345678');
+      await ctx.reply('Usage: /添加管理 +2348012345678');
       return;
     }
     var phone = normalizePhone(parts[1]);
@@ -919,15 +919,15 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // --- /removeadmin — remove a sub-admin ---
-  if (cmd === 'removeadmin' || cmd.startsWith('removeadmin ')) {
+  // --- /删除管理 — remove a sub-admin ---
+  if (cmd === '删除管理' || cmd.startsWith('删除管理 ')) {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
       return;
     }
     var parts = text.split(/\s+/);
     if (parts.length < 2) {
-      await ctx.reply('Usage: /removeadmin +2348012345678');
+      await ctx.reply('Usage: /删除管理 +2348012345678');
       return;
     }
     var phone = normalizePhone(parts[1]);
@@ -947,8 +947,8 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // --- /listadmin — list all sub-admins ---
-  if (cmd === 'listadmin') {
+  // --- /查看管理 — list all sub-admins ---
+  if (cmd === '查看管理') {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
       return;
@@ -981,6 +981,9 @@ bot.use(async (ctx, next) => {
       '/预支' + ''.padEnd(24) + '— 创建预支记录并从佣金扣除\n' +
       '/预支查询' + ''.padEnd(20) + '— 查看预支记录及应付金额\n' +
       '/结算' + ''.padEnd(24) + '— 结算指定月份佣金\n' +
+      '/添加管理' + ''.padEnd(20) + '— 添加子管理员\n' +
+      '/删除管理' + ''.padEnd(20) + '— 移除子管理员\n' +
+      '/查看管理' + ''.padEnd(20) + '— 查看所有子管理员\n' +
       '/bindbank' + ''.padEnd(20) + '— 绑定银行账户到当前聊天窗\n' +
       '/fixreferrer' + ''.padEnd(17) + '— 修正客户的推荐人（管理员）'
     );
@@ -1048,5 +1051,6 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
