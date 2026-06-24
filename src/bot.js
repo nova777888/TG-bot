@@ -681,7 +681,7 @@ bot.use(async (ctx, next) => {
 
     await ctx.reply('✅ Advance recorded: ₦' + advAmount.toFixed(2) + '\n💳 Deducted from future commissions');
     return;
-  }  }  // --- /预支查询 — show advance records with running payable ---
+  }  // --- /预支查询 — show advance records with running payable ---
   if (cmd === '预支查询') {
     var chatId = String(ctx.chat.id);
 
