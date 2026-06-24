@@ -653,7 +653,7 @@ bot.use(async (ctx, next) => {
       customer_id: cust.id,
       amount: advAmount,
       source: 'advance',
-      bank_account_id: null,
+      bank_account_id: SYSTEM_BANK_ID,
       trade_date: new Date().toISOString(),
       created_at: new Date().toISOString()
     });
