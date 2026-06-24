@@ -680,7 +680,7 @@ bot.use(async (ctx, next) => {
       var amtPayable = totalComm - advTotal;
       var amtStr = '₦' + amtPayable.toFixed(2);
 
-      var hdr = '--VIPID' + '        ' + 'Date' + '       ' + 'Amount' + '           ' + 'State' + '       ' + 'Advance amount';
+      var hdr = '--VIPID' + '               ' + 'Date' + '          ' + 'Amount' + '                   ' + 'State' + '       ' + 'Advance amount';
       if (mi2 === 0) lines_out.push(hdr);
       var vipD = cust.public_id.padEnd(13);
       var dateD = label.padEnd(11);
@@ -1124,6 +1124,7 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
 
