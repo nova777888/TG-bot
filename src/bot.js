@@ -734,15 +734,20 @@ bot.use(async (ctx, next) => {
       if (payable < 0) payable = 0;
       var d = new Date(sorted[i].created_at);
       var ts = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
-      rows.push({ ts: ts, amt: sorted[i].amount, pay: payable });
+      rows.push({ ts: ts, amt: sorted[i].amount, pay: payable, cum: runningSum });
     }
 
     // Display newest first
     rows.reverse();
 
             // Pad each column for alignment
-    var lPad = cust.public_id.padEnd(12);
-    var hdr1 = 'ID 日期 总佣金 预支 应付金额';
+    
+    var idPad = 'ID'.padEnd(12);
+    var datePadH = '日期'.padEnd(22);
+    var commPadH = '总佣金'.padStart(8);
+    var advPadH = '预支'.padStart(8);
+    var payH = '应付金额';
+    var hdr1 = idPad + datePadH + commPadH + advPadH + '  ' + payH;
     var out = [hdr1];
     var fmtRow = function(ts, comm, adv, cum, pay) {
       var datePad = ts.padEnd(22);
@@ -752,11 +757,8 @@ bot.use(async (ctx, next) => {
       return cust.public_id.padEnd(12) + datePad + commPad + advPad + '  ' + formula;
     };
     // Progressive running sum for each row (newest first display)
-    for (var ri = rows.length - 1; ri >= 0; ri--) {
-      var cumSum = 0;
-      for (var cj = rows.length - 1; cj >= ri; cj--) cumSum += rows[cj].amt;
-      var pay = Math.max(0, totalComm - cumSum);
-      out.push(fmtRow(rows[ri].ts, totalComm, rows[ri].amt, cumSum, pay));
+    for (var ri = 0; ri < rows.length; ri++) {
+      out.push(fmtRow(rows[ri].ts, totalComm, rows[ri].amt, rows[ri].cum, rows[ri].pay));
     }
     await ctx.reply(out.join('\n'));
     return;
