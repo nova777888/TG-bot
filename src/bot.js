@@ -679,24 +679,11 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Deduct from customer_balances.available_balance
-    var { data: bal } = await sb
-      .from('customer_balances')
-      .select('*')
-      .eq('customer_id', cust.id)
-      .maybeSingle();
-
-    if (bal) {
-      var newBal = (bal.available_balance || 0) - advAmount;
-      if (newBal < 0) newBal = 0;
-      await sb.from('customer_balances')
-        .update({ available_balance: newBal, updated_at: new Date().toISOString() })
-        .eq('id', bal.id);
-    }
 
     var remaining = bal ? (bal.available_balance - advAmount) : 0;
     if (remaining < 0) remaining = 0;
-    await ctx.reply('✅ Advance recorded: ₦' + advAmount.toFixed(2) + '\n💰 Remaining: ₦' + remaining.toFixed(2));
+    await ctx.reply('✅ Advance recorded: ₦' + advAmount.toFixed(2) + '\n💳 Deducted from future commissions');
+
     return;
   }
 
