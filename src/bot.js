@@ -537,36 +537,56 @@ bot.use(async (ctx, next) => {
     var months = [];
     for (var mi = 0; mi < 6; mi++) {
       var d = new Date(now.getFullYear(), now.getMonth() - mi, 1);
-      months.push(getMonthStr(d));
+      months.push({ str: getMonthStr(d), dt: d });
     }
 
-    // Query commissions for each month
-    var lines_out = [];
-    lines_out.push('📋 Commission Status\n');
+    // Query commissions per month
+    var lines_out = ['📋 Commission Status\n'];
     for (var mi2 = 0; mi2 < months.length; mi2++) {
       var m = months[mi2];
       var { data: comms } = await sb
         .from('commissions')
         .select('commission, settled')
         .eq('customer_id', cust.id)
-        .eq('month', m);
+        .eq('month', m.str);
+
+      if (!comms || comms.length === 0) continue; // skip months with no commissions
+
       var totalComm = 0;
       var allSettled = true;
-      if (comms && comms.length > 0) {
-        for (var ci = 0; ci < comms.length; ci++) {
-          totalComm += comms[ci].commission;
-          if (!comms[ci].settled) allSettled = false;
-        }
+      for (var ci = 0; ci < comms.length; ci++) {
+        totalComm += comms[ci].commission;
+        if (!comms[ci].settled) allSettled = false;
       }
-      // Format: 2026-05月   Settled/Unsettled   Amount
-      var y = m.substring(0, 4);
-      var mo = parseInt(m.substring(5, 7), 10);
+
+      var y = m.str.substring(0, 4);
+      var mo = parseInt(m.str.substring(5, 7), 10);
       var label = y + '-' + mo + '月';
-      var status = allSettled ? '✅ Settled' : (comms && comms.length > 0 ? '⏳ Unsettled' : '—');
-      var amtStr = totalComm > 0 ? totalComm.toFixed(2) : '0.00';
-      lines_out.push(label + '  ' + status + '  ₦' + amtStr);
+
+      // Check if current month
+      var isCurrentMonth = (mi2 === 0);
+      var state = isCurrentMonth ? '🔒 Locking' : (allSettled ? '✅ Settled' : '⏳ Unsettled');
+
+      // Query advances for this month
+      var { data: advs } = await sb
+        .from('advances')
+        .select('amount')
+        .eq('customer_id', cust.id)
+        .eq('month', m.str);
+      var advTotal = 0;
+      if (advs) {
+        for (var ai = 0; ai < advs.length; ai++) advTotal += advs[ai].amount;
+      }
+      var advanceYesNo = advTotal > 0 ? 'Yes' : 'No';
+
+      // Amount payable = commission - advance for this month
+      var amtPayable = totalComm - advTotal;
+      var amtStr = '₦' + amtPayable.toFixed(2);
+
+      lines_out.push(cust.public_id + '  ' + label + '  ' + amtStr + '  ' + state + '  ' + advanceYesNo);
     }
 
+    lines_out.push('\n⚠️ The commission for the current month cannot be settled and must wait until the next month for settlement.');
     await ctx.reply(lines_out.join('\n'));
     return;
   }
@@ -601,8 +621,95 @@ bot.use(async (ctx, next) => {
     }
 
     await ctx.reply('💰 This month commission: ₦' + total.toFixed(2));
+    return;
+  }
 
+  // --- /预支 — show advance records with running payable calculation ---
+  if (cmd === '预支') {
+    var chatId = String(ctx.chat.id);
 
+    var { data: cust } = await sb
+      .from('customers')
+      .select('id, name, public_id')
+      .eq('telegram_id', chatId)
+      .maybeSingle();
+
+    if (!cust) {
+      await ctx.reply('No customer bound. Use /vip first.');
+      return;
+    }
+
+    // Get all advances for this customer, ordered by created_at DESC
+    var { data: advances, error: advErr } = await sb
+      .from('advances')
+      .select('amount, created_at, month')
+      .eq('customer_id', cust.id)
+      .order('created_at', { ascending: false });
+
+    if (advErr) {
+      await ctx.reply('❌ Failed to query advances: ' + advErr.message);
+      return;
+    }
+
+    if (!advances || advances.length === 0) {
+      await ctx.reply('No advance records found.');
+      return;
+    }
+
+    // Group advances by month to get month total commission
+    var lines_out = ['📋 Advance Records\n'];
+    // Build month -> total commission map
+    var monthComms = {};
+    for (var ai2 = 0; ai2 < advances.length; ai2++) {
+      var mStr = advances[ai2].month || getMonthStr(new Date(advances[ai2].created_at));
+      if (!monthComms[mStr]) {
+        var { data: mComms } = await sb
+          .from('commissions')
+          .select('commission')
+          .eq('customer_id', cust.id)
+          .eq('month', mStr);
+        monthComms[mStr] = 0;
+        if (mComms) {
+          for (var mci = 0; mci < mComms.length; mci++) monthComms[mStr] += mComms[mci].commission;
+        }
+      }
+    }
+
+    // Calculate running: advances are deducted from earliest commissions
+    // First, reverse to chronological order
+    var chrons = advances.slice().reverse();
+    var runningAdv = 0;
+    // For display, show in descending order (newest first) with running calc
+    var displayRows = [];
+    for (var avi = chrons.length - 1; avi >= 0; avi--) {
+      var a = chrons[avi];
+      var mS = a.month || getMonthStr(new Date(a.created_at));
+      var totalCommMonth = monthComms[mS] || 0;
+      runningAdv += a.amount;
+      var payable = totalCommMonth - runningAdv;
+      if (payable < 0) payable = 0;
+      var d = new Date(a.created_at);
+      var dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
+      displayRows.push({
+        date: dateStr,
+        commission: totalCommMonth,
+        advance: a.amount,
+        payable: payable,
+        remaining: totalCommMonth - runningAdv
+      });
+    }
+
+    // Display in descending order (newest first)
+    lines_out.push(cust.public_id + '  Date  Commission  Advance  Amount Payable');
+    for (var dri = 0; dri < displayRows.length; dri++) {
+      var r = displayRows[dri];
+      var calcStr = r.commission.toFixed(0) + '-' + r.advance.toFixed(0) + '=' + r.payable.toFixed(0);
+      lines_out.push(cust.public_id + '  ' + r.date + '  ' + r.commission.toFixed(0) + '  ' + r.advance.toFixed(0) + '  ' + calcStr);
+    }
+
+    await ctx.reply(lines_out.join('\n'));
+    return;
+  }
 
   // --- /结算 — settle commissions for a specified month (e.g. /结算 2026-5月) ---
   if (cmd.startsWith('结算')) {
@@ -648,7 +755,6 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Update customer_balances.total_earned
     var referrerTotals = {};
     pending.forEach(function(c) {
       referrerTotals[c.customer_id] = (referrerTotals[c.customer_id] || 0) + c.commission;
@@ -656,7 +762,7 @@ bot.use(async (ctx, next) => {
 
     for (var refId in referrerTotals) {
       if (!referrerTotals.hasOwnProperty(refId)) continue;
-      var amt = referrerTotals[refId];
+      var thisAmt = referrerTotals[refId];
       var { data: refBal } = await sb
         .from('customer_balances')
         .select('*')
@@ -665,7 +771,7 @@ bot.use(async (ctx, next) => {
 
       if (refBal) {
         await sb.from('customer_balances')
-          .update({ total_earned: (refBal.total_earned || 0) + amt, updated_at: new Date().toISOString() })
+          .update({ total_earned: (refBal.total_earned || 0) + thisAmt, updated_at: new Date().toISOString() })
           .eq('id', refBal.id);
       }
     }
@@ -674,6 +780,7 @@ bot.use(async (ctx, next) => {
     return;
   }
 
+  
   // --- /帮助 or /指令 — show all commands ---
   if (cmd === '帮助' || cmd === '指令') {
     await ctx.reply(
@@ -682,8 +789,9 @@ bot.use(async (ctx, next) => {
       '/-vip +2348012345678 — 解除 VIP 会员绑定\n' +
       '/下发1000 — 给当前客户加账\n' +
       '/撤回 — 撤销上一次加账\n' +
-      '/查账 — 查看近 6 个月佣金状态\n' +
+      '/查账 — 查看近 6 个月佣金状态 (含预支)\n' +
       '/佣金 — 查看本月赚取佣金总数\n' +
+      '/预支 — 查看预支记录及应付金额\n' +
       '/结算 2026-5月 — 结算指定月份佣金\n' +
       '/bindbank — 绑定银行账户到当前聊天窗\n' +
       '/fixreferrer — 修正客户的推荐人（管理员）'
@@ -691,7 +799,7 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // Not a Chinese command — continue to hears handlers
+// Not a Chinese command — continue to hears handlers
   return next();
 });
 
