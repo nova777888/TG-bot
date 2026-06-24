@@ -30,17 +30,23 @@ var subAdminCache = {};
 var subAdminCacheTime = 0;
 
 async function ensureSubAdminsTable() {
-  var dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) { console.log('[SUB_ADMIN] DATABASE_URL not set'); return false; }
+  // Try using Supabase REST API with service_role key to access sub_admins
+  // If table does not exist, sub_admin features are disabled gracefully
   try {
-    var pool = new (require('pg').Pool)({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, family: 4 });
-    await pool.query("CREATE TABLE IF NOT EXISTS public.sub_admins (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), telegram_id TEXT NOT NULL UNIQUE, customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT now(), created_by UUID REFERENCES public.customers(id) ON DELETE SET NULL);");
-    await pool.query("ALTER TABLE public.sub_admins ENABLE ROW LEVEL SECURITY;").catch(function(){});
-    await pool.end();
-    console.log('[SUB_ADMIN] Table ensured');
+    var { data } = await sb.from('sub_admins').select('id').limit(1);
+    console.log('[SUB_ADMIN] Table exists, sub-admin features ready');
     return true;
   } catch (e) {
-    console.log('[SUB_ADMIN] Table creation failed:', e.message);
+    console.log('[SUB_ADMIN] Table does not exist - sub-admin features disabled');
+    console.log('[SUB_ADMIN] Run this SQL in Supabase SQL Editor:');
+    console.log('  CREATE TABLE IF NOT EXISTS public.sub_admins (');
+    console.log('    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),');
+    console.log("    telegram_id TEXT NOT NULL UNIQUE,");
+    console.log("    customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE,");
+    console.log("    created_at TIMESTAMPTZ DEFAULT now(),");
+    console.log("    created_by UUID REFERENCES public.customers(id) ON DELETE SET NULL");
+    console.log('  );');
+    console.log('  ALTER TABLE public.sub_admins ENABLE ROW LEVEL SECURITY;');
     return false;
   }
 }
