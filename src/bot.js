@@ -693,12 +693,12 @@ bot.use(async (ctx, next) => {
 
     // Subtract advances for this month
     var { data: advs } = await sb
-      .from('''transactions''')
-      .select('''amount''')
-      .eq('''customer_id''', cust.id)
-      .eq('''source''', '''advance''')
-      .gte('''created_at''', thisMonth + '''-01''')
-      .lt('''created_at''', getMonthStr(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) + '''-01''');
+      .from('transactions')
+      .select('amount')
+      .eq('customer_id', cust.id)
+      .eq('source', 'advance')
+      .gte('created_at', thisMonth + '-01')
+      .lt('created_at', getMonthStr(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) + '-01');
     var advTotal = 0;
     if (advs) {
       for (var ai2 = 0; ai2 < advs.length; ai2++) advTotal += advs[ai2].amount;
@@ -1065,6 +1065,8 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
+
 
 
 
