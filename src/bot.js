@@ -168,6 +168,14 @@ function decryptPhone(encrypted) {
   return decipher.update(parts[1], 'hex', 'utf8') + decipher.final('utf8');
 }
 
+function encryptPhone(plain) {
+  var iv = crypto.randomBytes(16);
+  var cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
+  var enc = cipher.update(plain, 'utf8', 'hex') + cipher.final('hex');
+  return iv.toString('hex') + ':' + enc;
+
+}
+
 // ============================================================
 // Bot setup
 // ============================================================
@@ -1070,6 +1078,7 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
 
