@@ -232,7 +232,7 @@ bot.hears(/^\/?vip(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
   // Check if this chat already has a bound customer
   var { data: existingBound } = await sb
     .from('customers')
-    .select('id, name, public_id')
+    .select('id, name, public_id, phone_encrypted')
     .eq('telegram_id', chatId)
     .maybeSingle();
 
@@ -600,7 +600,7 @@ bot.use(async (ctx, next) => {
 
     var { data: cust } = await sb
       .from('customers')
-      .select('id, name, public_id')
+      .select('id, name, public_id, phone_encrypted')
       .eq('telegram_id', chatId)
       .maybeSingle();
 
@@ -618,7 +618,11 @@ bot.use(async (ctx, next) => {
     }
 
     // Query commissions per month
-    var lines_out = ['📋 Commission Status\n'];
+    var phoneDisplay = 'N/A';
+    if (cust.phone_encrypted) {
+      try { phoneDisplay = decryptPhone(cust.phone_encrypted); } catch(e) {}
+    }
+    var lines_out = ['📞 ' + phoneDisplay + '\n💎 ' + cust.public_id + '\n\n📋 Commission Status\n'];
     for (var mi2 = 0; mi2 < months.length; mi2++) {
       var m = months[mi2];
       var { data: comms } = await sb
@@ -682,7 +686,7 @@ bot.use(async (ctx, next) => {
     var chatId = String(ctx.chat.id);
     var { data: cust } = await sb
       .from('customers')
-      .select('id, name, public_id')
+      .select('id, name, public_id, phone_encrypted')
       .eq('telegram_id', chatId)
       .maybeSingle();
 
@@ -714,7 +718,7 @@ bot.use(async (ctx, next) => {
 
     var { data: cust } = await sb
       .from('customers')
-      .select('id, name, public_id')
+      .select('id, name, public_id, phone_encrypted')
       .eq('telegram_id', chatId)
       .maybeSingle();
 
@@ -995,6 +999,28 @@ bot.use(async (ctx, next) => {
     return;
   }
 
+  // --- /我的信息 — show current customer's info
+  if (cmd === '我的信息' || cmd === 'info') {
+    var chatId = String(ctx.chat.id);
+    var { data: cust } = await sb
+      .from('customers')
+      .select('id, name, public_id, phone_encrypted, telegram_id')
+      .eq('telegram_id', chatId)
+      .maybeSingle();
+    if (!cust) {
+      await ctx.reply('No customer bound. Use /vip +2348012345678 first.');
+      return;
+    }
+    var phoneDisplay = 'N/A';
+    if (cust.phone_encrypted) {
+      try {
+        phoneDisplay = decryptPhone(cust.phone_encrypted);
+      } catch(e) { phoneDisplay = 'Error'; }
+    }
+    await ctx.reply('📞 Phone: ' + phoneDisplay + '\n💎 VIP ID: ' + cust.public_id + '\n👤 Name: ' + (cust.name || 'N/A'));
+    return;
+  }
+
   // --- /帮助 or /指令 — show all commands ---
   if (cmd === '帮助' || cmd === '指令') {
     await ctx.reply(
@@ -1008,6 +1034,7 @@ bot.use(async (ctx, next) => {
       '/预支查询' + ''.padEnd(20) + '— 查看预支记录及应付金额\n' +
       '/结算' + ''.padEnd(24) + '— 结算指定月份佣金\n' +
       '/注册' + ''.padEnd(24) + '— 直接注册手机号为会员\n' +
+      '/我的信息' + ''.padEnd(24) + '— 查看当前绑定客户的信息\n' +
       '/添加管理' + ''.padEnd(20) + '— 添加子管理员\n' +
       '/删除管理' + ''.padEnd(20) + '— 移除子管理员\n' +
       '/查看管理' + ''.padEnd(20) + '— 查看所有子管理员\n' +
@@ -1078,6 +1105,8 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
+
 
 
 
