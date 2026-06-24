@@ -740,13 +740,23 @@ bot.use(async (ctx, next) => {
     // Display newest first
     rows.reverse();
 
-        var out = [cust.public_id + '  日期  总佣金  预支  应付金额'];
+            // Pad each column for alignment
+    var lPad = cust.public_id.padEnd(12);
+    var hdr1 = 'ID 日期 总佣金 预支 应付金额';
+    var out = [hdr1];
+    var fmtRow = function(ts, comm, adv, cum, pay) {
+      var datePad = ts.padEnd(22);
+      var commPad = String(comm).padStart(8);
+      var advPad = String(adv).padStart(8);
+      var formula = String(comm) + '-' + String(cum) + '=' + String(pay);
+      return cust.public_id.padEnd(12) + datePad + commPad + advPad + '  ' + formula;
+    };
     // Progressive running sum for each row (newest first display)
     for (var ri = rows.length - 1; ri >= 0; ri--) {
       var cumSum = 0;
       for (var cj = rows.length - 1; cj >= ri; cj--) cumSum += rows[cj].amt;
       var pay = Math.max(0, totalComm - cumSum);
-      out.push(cust.public_id + '  ' + rows[ri].ts + '  ' + totalComm.toFixed(0) + '  ' + rows[ri].amt.toFixed(0) + '  ' + totalComm.toFixed(0) + '-' + cumSum.toFixed(0) + '=' + pay.toFixed(0));
+      out.push(fmtRow(rows[ri].ts, totalComm, rows[ri].amt, cumSum, pay));
     }
     await ctx.reply(out.join('\n'));
     return;
