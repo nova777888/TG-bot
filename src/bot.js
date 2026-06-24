@@ -476,154 +476,152 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
 
 
 // ============================================================
-// /撤回 — undo last credit
-// ============================================================
-bot.hears(/^\/?撤回(?:@\w+)?$/, async (ctx) => {
-  var chatId = String(ctx.chat.id);
-  var last = lastCredit[chatId];
-
-  if (!last) {
-    await ctx.reply('Nothing to undo.');
-    return;
-  }
-
-  // Restore previous balance
-  var { error: updateErr } = await sb
-    .from('customer_balances')
-    .update({ available_balance: last.prev_balance, updated_at: new Date().toISOString() })
-    .eq('customer_id', last.customer_id);
-
-  if (updateErr) {
-    await ctx.reply('❌ Failed to undo: ' + updateErr.message);
-    return;
-  }
-
-  delete lastCredit[chatId];
-  await ctx.reply('↩️ Undid +' + last.amount + ' (balance restored to ' + last.prev_balance + ')');
-});
 
 // ============================================================
-// /balance — show customer balance
+// Chinese command router — handles all Chinese-text commands
+// Uses manual text routing instead of hears to avoid
+// grammy/Telegram Unicode regex matching issues
 // ============================================================
-bot.hears(/^\/?查账(?:@\w+)?$/, async (ctx) => {
-  var chatId = String(ctx.chat.id);
+bot.use(async (ctx, next) => {
+  if (!ctx.message || !ctx.message.text) return next();
 
-  var { data: customer } = await sb
-    .from('customers')
-    .select('id, name')
-    .eq('telegram_id', chatId)
-    .maybeSingle();
+  var text = ctx.message.text.trim();
+  // Normalize: remove leading / and optional @botname suffix
+  var cmd = text.replace(/^\/+/, '').replace(/@\w+$/, '');
 
-  if (!customer) {
-    await ctx.reply('No customer bound. Use /vip first.');
-    return;
-  }
+  // 下发 is handled by its own hears handler below
+  if (/^下发\d+$/.test(cmd)) return next();
 
-  var { data: bal } = await sb
-    .from('customer_balances')
-    .select('*')
-    .eq('customer_id', customer.id)
-    .maybeSingle();
+  // --- /撤回 — undo last credit ---
+  if (cmd === '撤回') {
+    var chatId = String(ctx.chat.id);
+    var last = lastCredit[chatId];
 
-  var balance = bal ? bal.available_balance : 0;
-  var earned = bal ? bal.total_earned : 0;
+    if (!last) {
+      await ctx.reply('Nothing to undo.');
+      return;
+    }
 
-  await ctx.reply('💰 ' + customer.name + '\n🔑 ' + (customer.public_id || 'N/A') + '\nAvailable: ' + balance + '\nTotal Earned: ' + earned);
-});
-
-// ============================================================
-// /settle — settle last month's pending commissions
-// ============================================================
-bot.hears(/^\/?结算(?:@\w+)?$/, async (ctx) => {
-  var now = new Date();
-  var monthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-  var monthEnd = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-  var { data: pending, error: fetchErr } = await sb
-    .from('commissions')
-    .select('id, commission, customer_id')
-    .eq('settled', false)
-    .eq('month', lastMonth);
-
-  if (fetchErr) {
-    await ctx.reply('❌ Failed to query commissions: ' + fetchErr.message);
-    return;
-  }
-
-  if (!pending || pending.length === 0) {
-    await ctx.reply('No pending commissions for last month.');
-    return;
-  }
-
-  // Update all to settled
-  var ids = pending.map(function(r) { return r.id; });
-  var { error: updateErr } = await sb
-    .from('commissions')
-    .update({ settled: true, settled_at: new Date().toISOString() })
-    .in('id', ids);
-
-  if (updateErr) {
-    await ctx.reply('❌ Settlement failed: ' + updateErr.message);
-    return;
-  }
-
-  // Update customer_balances.total_earned for each referrer
-  var referrerTotals = {};
-  pending.forEach(function(c) {
-    referrerTotals[c.customer_id] = (referrerTotals[c.customer_id] || 0) + c.commission;
-  });
-
-  for (var refId in referrerTotals) {
-    var amt = referrerTotals[refId];
-    var { data: refBal } = await sb
+    var { error: updateErr } = await sb
       .from('customer_balances')
-      .select('*')
-      .eq('customer_id', refId)
+      .update({ available_balance: last.prev_balance, updated_at: new Date().toISOString() })
+      .eq('customer_id', last.customer_id);
+
+    if (updateErr) {
+      await ctx.reply('❌ Failed to undo: ' + updateErr.message);
+      return;
+    }
+
+    delete lastCredit[chatId];
+    await ctx.reply('↩️ Undid +' + last.amount + ' (balance restored to ' + last.prev_balance + ')');
+    return;
+  }
+
+  // --- /查账 — show customer balance ---
+  if (cmd === '查账') {
+    var chatId = String(ctx.chat.id);
+
+    var { data: customer } = await sb
+      .from('customers')
+      .select('id, name, public_id')
+      .eq('telegram_id', chatId)
       .maybeSingle();
 
-    if (refBal) {
-      await sb.from('customer_balances')
-        .update({ total_earned: (refBal.total_earned || 0) + amt, updated_at: new Date().toISOString() })
-        .eq('id', refBal.id);
+    if (!customer) {
+      await ctx.reply('No customer bound. Use /vip first.');
+      return;
     }
+
+    var { data: bal } = await sb
+      .from('customer_balances')
+      .select('*')
+      .eq('customer_id', customer.id)
+      .maybeSingle();
+
+    var balance = bal ? bal.available_balance : 0;
+    var earned = bal ? bal.total_earned : 0;
+
+    await ctx.reply('💰 ' + customer.name + '\n🔑 ' + (customer.public_id || 'N/A') + '\nAvailable: ' + balance + '\nTotal Earned: ' + earned);
+    return;
   }
 
-  await ctx.reply('✅ Settled ' + pending.length + ' commissions for last month');
+  // --- /结算 — settle last month's pending commissions ---
+  if (cmd === '结算') {
+    var now = new Date();
+    var lastMonth = getMonthStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+    var { data: pending, error: fetchErr } = await sb
+      .from('commissions')
+      .select('id, commission, customer_id')
+      .eq('settled', false)
+      .eq('month', lastMonth);
+
+    if (fetchErr) {
+      await ctx.reply('❌ Failed to query commissions: ' + fetchErr.message);
+      return;
+    }
+
+    if (!pending || pending.length === 0) {
+      await ctx.reply('No pending commissions for last month.');
+      return;
+    }
+
+    var ids = pending.map(function(r) { return r.id; });
+    var { error: updateErr } = await sb
+      .from('commissions')
+      .update({ settled: true, settled_at: new Date().toISOString() })
+      .in('id', ids);
+
+    if (updateErr) {
+      await ctx.reply('❌ Settlement failed: ' + updateErr.message);
+      return;
+    }
+
+    var referrerTotals = {};
+    pending.forEach(function(c) {
+      referrerTotals[c.customer_id] = (referrerTotals[c.customer_id] || 0) + c.commission;
+    });
+
+    for (var refId in referrerTotals) {
+      if (!referrerTotals.hasOwnProperty(refId)) continue;
+      var amt = referrerTotals[refId];
+      var { data: refBal } = await sb
+        .from('customer_balances')
+        .select('*')
+        .eq('customer_id', refId)
+        .maybeSingle();
+
+      if (refBal) {
+        await sb.from('customer_balances')
+          .update({ total_earned: (refBal.total_earned || 0) + amt, updated_at: new Date().toISOString() })
+          .eq('id', refBal.id);
+      }
+    }
+
+    await ctx.reply('✅ Settled ' + pending.length + ' commissions for last month');
+    return;
+  }
+
+  // --- /帮助 or /指令 — show all commands ---
+  if (cmd === '帮助' || cmd === '指令') {
+    await ctx.reply(
+      '🤖 Nova 机器人指令\n\n' +
+      '/vip +2348012345678 — 绑定 VIP 会员到当前聊天窗\n' +
+      '/-vip +2348012345678 — 解除 VIP 会员绑定\n' +
+      '/下发1000 — 给当前客户加账\n' +
+      '/撤回 — 撤销上一次加账\n' +
+      '/查账 — 查看当前客户余额\n' +
+      '/结算 — 结算上月佣金\n' +
+      '/bindbank — 绑定银行账户到当前聊天窗\n' +
+      '/fixreferrer — 修正客户的推荐人（管理员）'
+    );
+    return;
+  }
+
+  // Not a Chinese command — continue to hears handlers
+  return next();
 });
 
-// ============================================================
-// /help
-// ============================================================
-bot.hears(/^\/?帮助(?:@\w+)?$/, async (ctx) => {
-  await ctx.reply(
-    '🤖 Nova 机器人指令\n\n' +
-    '/vip +2348012345678 \u2014 绑定 VIP 会员到当前聊天窗\n' +
-    '/-vip +2348012345678 \u2014 解除 VIP 会员绑定\n' +
-    '/下发1000 \u2014 给当前客户加账\n' +
-    '/撤回 \u2014 撤销上一次加账\n' +
-    '/查账 \u2014 查看当前客户余额\n' +
-    '/结算 \u2014 结算上月佣金\n' +
-    '/bindbank \u2014 绑定银行账户到当前聊天窗\n' +
-    '/fixreferrer \u2014 修正客户的推荐人（管理员）'
-  );
-});
-
-// ============================================================
-// /指令 \u2014 show all commands (Chinese)
-// ============================================================
-bot.hears(/^\/?指令(?:@\w+)?$/, async (ctx) => {
-  await ctx.reply(
-    '🤖 Nova 机器人指令\n\n' +
-    '/vip +2348012345678 \u2014 绑定 VIP 会员到当前聊天窗\n' +
-    '/-vip +2348012345678 \u2014 解除 VIP 会员绑定\n' +
-    '/下发1000 \u2014 给当前客户加账\n' +
-    '/撤回 \u2014 撤销上一次加账\n' +
-    '/查账 \u2014 查看当前客户余额\n' +
-    '/结算 \u2014 结算上月佣金\n' +
-    '/bindbank \u2014 绑定银行账户到当前聊天窗\n' +
-    '/fixreferrer \u2014 修正客户的推荐人（管理员）'
-  );
-});
 
 // ============================================================
 // Fallback: remind to bind
