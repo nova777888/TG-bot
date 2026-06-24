@@ -541,7 +541,7 @@ bot.hears(/^\/?下发\s*(\d+)$/, async (ctx) => {
       totalMonthComm += monthComms[mc].commission;
     }
   }
-  reply += '\n💰️ commission: ₦' + totalMonthComm.toFixed(2);
+  // Subtract advances for this month\n  var { data: advs_2 } = await sb\n    .from('transactions')\n    .select('amount')\n    .eq('customer_id', customer.id)\n    .eq('source', 'advance')\n    .gte('created_at', thisMonth + '-01')\n    .lt('created_at', getMonthStr(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) + '-01');\n  var advTotal2 = 0;\n  if (advs_2) {\n    for (var a2 = 0; a2 < advs_2.length; a2++) advTotal2 += advs_2[a2].amount;\n  }\n  var netComm = totalMonthComm - advTotal2;\n  if (netComm < 0) netComm = 0;\n  reply += '\n💰️ commission: ₦' + netComm.toFixed(2);
   if (commissionParts.length > 0) {
     reply += '\n━━━━━━━━━━━━━━━━\n🏆 Referral Commission\n' + commissionParts.join('\n');
   }
@@ -1110,6 +1110,8 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
+
 
 
 
