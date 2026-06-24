@@ -984,6 +984,57 @@ bot.use(async (ctx, next) => {
     return;
   }
 
+  // --- /注册 — register a new customer by phone directly
+  if (cmd === '注册' || cmd.startsWith('注册 ')) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
+      await ctx.reply('⛔ Only main admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    if (parts.length < 2) {
+      await ctx.reply('Usage: /注册 +2348012345678');
+      return;
+    }
+    var phoneRaw = parts.slice(1).join('');
+    var phone = normalizePhone(phoneRaw);
+    var ph = hashPhone(phone);
+
+    // Check if already registered
+    var { data: existing } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
+    if (existing) {
+      await ctx.reply('⚠️ Phone ' + phone + ' is already registered');
+      return;
+    }
+
+    // Generate unique public_id (VIP + 5 random digits)
+    var pubId = '';
+    var unique = false;
+    while (!unique) {
+      var digits = '';
+      for (var d = 0; d < 5; d++) digits += Math.floor(Math.random() * 10);
+      pubId = 'VIP' + digits;
+      var { data: check } = await sb.from('customers').select('id').eq('public_id', pubId).maybeSingle();
+      if (!check) unique = true;
+    }
+
+    var encPhone = encryptPhone(phone);
+
+    var { error: insErr } = await sb.from('customers').insert({
+      phone_encrypted: encPhone,
+      phone_hash: ph,
+      public_id: pubId,
+      name: 'User'
+    });
+
+    if (insErr) {
+      await ctx.reply('❌ Failed to register: ' + insErr.message);
+      return;
+    }
+
+    await ctx.reply('✅ Registered ' + phone + '\n🔑 ' + pubId + '\nYou can now use /添加管理 ' + phone);
+    return;
+  }
+
   // --- /帮助 or /指令 — show all commands ---
   if (cmd === '帮助' || cmd === '指令') {
     await ctx.reply(
@@ -997,6 +1048,7 @@ bot.use(async (ctx, next) => {
       '/预支' + ''.padEnd(24) + '— 创建预支记录并从佣金扣除\n' +
       '/预支查询' + ''.padEnd(20) + '— 查看预支记录及应付金额\n' +
       '/结算' + ''.padEnd(24) + '— 结算指定月份佣金\n' +
+      '/注册' + ''.padEnd(24) + '— 直接注册手机号为会员\n' +
       '/添加管理' + ''.padEnd(20) + '— 添加子管理员\n' +
       '/删除管理' + ''.padEnd(20) + '— 移除子管理员\n' +
       '/查看管理' + ''.padEnd(20) + '— 查看所有子管理员\n' +
@@ -1067,6 +1119,8 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
+
 
 
 
