@@ -481,7 +481,7 @@ bot.hears(/^\/?下发\s*(\d+)$/, async (ctx) => {
     } catch(e) {}
   }
 
-  var reply = '✅ Issued ' + amount + '\n\n👤\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n💎 ' + (customer.public_id || 'N/A');
+  var reply = '✅ Issued ' + amount + '\n\n👤\ufe0f ' + customer.name + '\n💎 ' + (customer.public_id || 'N/A');
 
     // Always create a transaction record
   var bankId = await ensureSystemBankAccount();
@@ -636,7 +636,7 @@ bot.use(async (ctx, next) => {
     if (cust.phone_encrypted) {
       try { phoneDisplay = decryptPhone(cust.phone_encrypted); } catch(e) {}
     }
-    var lines_out = ['📞 ' + phoneDisplay + '\n💎 ' + cust.public_id + '\n\n📋 Commission Status\n'];
+    var lines_out = ['💎 ' + cust.public_id + '\n📞 ' + phoneDisplay + '\n\n📋 Commission Status\n'];
     for (var mi2 = 0; mi2 < months.length; mi2++) {
       var m = months[mi2];
       var { data: comms } = await sb
@@ -1124,6 +1124,7 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
 
 
 
