@@ -412,15 +412,15 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
   lastCredit[chatId] = { amount: amount, customer_id: customer.id, prev_balance: bal ? bal.available_balance : 0 };
 
   // Build reply — phone display
-  var phoneDisplay = '📱 Bound';
+  var phoneDisplay = '📞 Bound';
   if (customer.phone_encrypted) {
     try {
       var plain = decryptPhone(customer.phone_encrypted);
-      if (plain) phoneDisplay = '📱 ' + plain;
+      if (plain) phoneDisplay = '📞 ' + plain;
     } catch(e) {}
   }
 
-  var reply = '✅ Issued ' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
+  var reply = '✅ Issued ' + amount + '\n\n👤\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n💎 ' + (customer.public_id || 'N/A');
 
     // Always create a transaction record
   var bankId = await ensureSystemBankAccount();
@@ -466,6 +466,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
     }
     currentParentId = parent.parent_id;
 
+  } // end for loop
   // Query current month total commission earned
   var thisMonth = getMonthStr(new Date());
   var { data: monthComms } = await sb
@@ -479,8 +480,8 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
       totalMonthComm += monthComms[mc].commission;
     }
   }
-  reply += '\ncommission: ₦' + totalMonthComm.toFixed(2);
-    }if (commissionParts.length > 0) {
+  reply += '\n💰️ commission: ₦' + totalMonthComm.toFixed(2);
+  if (commissionParts.length > 0) {
     reply += '\n━━━━━━━━━━━━━━━━\n🏆 Referral Commission\n' + commissionParts.join('\n');
   }
 
