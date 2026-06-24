@@ -760,7 +760,7 @@ bot.use(async (ctx, next) => {
     }
     await ctx.reply(out.join('\n'));
     return;
-  }  }// --- /结算 — settle commissions for a specified month (e.g. /结算 2026-5月) ---
+  }// --- /结算 — settle commissions for a specified month (e.g. /结算 2026-5月) ---
   if (cmd.startsWith('结算')) {
     // Parse month parameter: /结算 2026-5月
     var parts = text.replace(/^\/+/, '').replace(/@\w+$/, '').split(/\s+/);
