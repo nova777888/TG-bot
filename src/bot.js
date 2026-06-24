@@ -707,7 +707,7 @@ bot.use(async (ctx, next) => {
 
     await ctx.reply('✅ Advance recorded: ₦' + availableAdvance.toFixed(2) + '\n💳 Deducted from future commissions');
     return;
-  }  // --- /预支查询 — show advance records ---
+  }  // --- /预支查询 — show advance records with running payable ---
   if (cmd === '预支查询') {
     var chatId = String(ctx.chat.id);
 
@@ -722,7 +722,17 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Get all advances (transactions with source=advance), newest first
+    // Total commission earned (all time)
+    var { data: allComms } = await sb
+      .from('commissions')
+      .select('commission')
+      .eq('customer_id', cust.id);
+    var totalComm = 0;
+    if (allComms) {
+      for (var ci = 0; ci < allComms.length; ci++) totalComm += allComms[ci].commission;
+    }
+
+    // All advance records (newest first)
     var { data: advances, error: advErr } = await sb
       .from('transactions')
       .select('amount, created_at')
@@ -740,38 +750,31 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Get total commissions across all months
-    var { data: allComms } = await sb
-      .from('commissions')
-      .select('commission')
-      .eq('customer_id', cust.id);
-    var totalCommAll = 0;
-    if (allComms) {
-      for (var aci = 0; aci < allComms.length; aci++) totalCommAll += allComms[aci].commission;
+    // Running payable: sort chronologically, subtract each advance
+    var sorted = advances.slice().reverse(); // oldest first
+    var runningSum = 0;
+    var rows = [];
+    for (var i = 0; i < sorted.length; i++) {
+      runningSum += sorted[i].amount;
+      var payable = totalComm - runningSum;
+      if (payable < 0) payable = 0;
+      var d = new Date(sorted[i].created_at);
+      var ts = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+      rows.push({ ts: ts, amt: sorted[i].amount, pay: payable });
     }
 
-    // Show each advance with running deduction (from earliest commissions)
-    var remainingComm = totalCommAll;
-    var lines_out = ['📋 Advance Records\n'];
-    lines_out.push(cust.public_id + '  Date  Commission  Advance  Amount Payable');
+    // Display newest first
+    rows.reverse();
 
-    // Process newest first (as user requested)
-    for (var avi = 0; avi < advances.length; avi++) {
-      var a = advances[avi];
-      var d = new Date(a.created_at);
-      var dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0');
-
-      // Calculate payable: deduct this advance from remaining commission
-      var payable = Math.max(0, remainingComm - a.amount);
-      var calcStr = remainingComm.toFixed(0) + '-' + a.amount.toFixed(0) + '=' + payable.toFixed(0);
-      lines_out.push(cust.public_id + '  ' + dateStr + '  ' + remainingComm.toFixed(0) + '  ' + a.amount.toFixed(0) + '  ' + calcStr);
-
-      remainingComm = payable; // update for next row
+    var out = [cust.public_id + '  Date  Commission  Advance  Amount Payable'];
+    for (var ri = 0; ri < rows.length; ri++) {
+      var r = rows[ri];
+      out.push(cust.public_id + '  ' + r.ts + '  ' + totalComm.toFixed(0) + '  ' + r.amt.toFixed(0) + '  ' + totalComm.toFixed(0) + '-' + runningSum.toFixed(0) + '=' + r.pay.toFixed(0));
     }
 
-    await ctx.reply(lines_out.join('\n'));
+    await ctx.reply(out.join('\n'));
     return;
-  }// --- /结算 — settle commissions for a specified month (e.g. /结算 2026-5月) ---
+  }  }// --- /结算 — settle commissions for a specified month (e.g. /结算 2026-5月) ---
   if (cmd.startsWith('结算')) {
     // Parse month parameter: /结算 2026-5月
     var parts = text.replace(/^\/+/, '').replace(/@\w+$/, '').split(/\s+/);
