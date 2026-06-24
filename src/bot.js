@@ -412,7 +412,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
   lastCredit[chatId] = { amount: amount, customer_id: customer.id, prev_balance: bal ? bal.available_balance : 0 };
 
   // Build reply — phone display
-  var phoneDisplay = '📱 已绑定';
+  var phoneDisplay = '📱 Bound';
   if (customer.phone_encrypted) {
     try {
       var plain = decryptPhone(customer.phone_encrypted);
@@ -420,7 +420,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
     } catch(e) {}
   }
 
-  var reply = '✅ 下发' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
+  var reply = '✅ Issued ' + amount + '\n\n✪\ufe0f ' + customer.name + '\n' + phoneDisplay + '\n🔑 ' + (customer.public_id || 'N/A');
 
     // Always create a transaction record
   var bankId = await ensureSystemBankAccount();
@@ -435,7 +435,7 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
 
   // Commission chain: up to 4 levels
   var rates = [0.01, 0.005, 0.003, 0.002];
-  var levelNames = ['直推', 'FF', 'FFF', 'Member'];
+  var levelNames = ['L1', 'L2', 'L3', 'L4'];
   var commissionParts = [];
   var currentParentId = customer.parent_id;
 
@@ -466,10 +466,10 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
     }
     currentParentId = parent.parent_id;
   }if (commissionParts.length > 0) {
-    reply += '\n━━━━━━━━━━━━━━━━\n🏆 推荐佣金\n' + commissionParts.join('\n');
+    reply += '\n━━━━━━━━━━━━━━━━\n🏆 Referral Commission\n' + commissionParts.join('\n');
   }
 
-  reply += '\n📢 让朋友注册时填你的ID: ' + (customer.public_id || 'N/A');
+  reply += '\n📢 Referral ID: ' + (customer.public_id || 'N/A');
 
   await ctx.reply(reply);
 });
