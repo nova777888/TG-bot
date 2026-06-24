@@ -1054,3 +1054,4 @@ bot.on('message:text', async (ctx) => {
 
 
 
+
