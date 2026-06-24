@@ -465,7 +465,22 @@ bot.hears(/^\/?下发(\d+)$/, async (ctx) => {
       commissionParts.push('  ' + levelNames[level] + ' (' + (rates[level] * 100) + '%): +' + commissionAmt.toFixed(2));
     }
     currentParentId = parent.parent_id;
-  }if (commissionParts.length > 0) {
+
+  // Query current month total commission earned
+  var thisMonth = getMonthStr(new Date());
+  var { data: monthComms } = await sb
+    .from('commissions')
+    .select('commission')
+    .eq('customer_id', customer.id)
+    .eq('month', thisMonth);
+  var totalMonthComm = 0;
+  if (monthComms) {
+    for (var mc = 0; mc < monthComms.length; mc++) {
+      totalMonthComm += monthComms[mc].commission;
+    }
+  }
+  reply += '\ncommission: ₦' + totalMonthComm.toFixed(2);
+    }if (commissionParts.length > 0) {
     reply += '\n━━━━━━━━━━━━━━━━\n🏆 Referral Commission\n' + commissionParts.join('\n');
   }
 
