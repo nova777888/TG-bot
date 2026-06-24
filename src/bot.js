@@ -873,13 +873,15 @@ bot.on('message:text', async (ctx) => {
 // ============================================================
 // Clear webhook then start
 (async () => {
-  // Kill webhook first
-  await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-  // Wait for old container to fully shut down
-  await new Promise(function(r) { setTimeout(r, 2000); });
-  // Retry loop: keep trying until we get past the 409 conflict
-  var maxRetries = 5;
-  for (var attempt = 0; attempt < maxRetries; attempt++) {
+  // Kill webhook & force close any existing polling sessions
+  await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(function() {});
+  // Set empty webhook to force-terminate old getUpdates
+  await bot.api.setWebhook({ url: '' }).catch(function() {});
+  // Wait for Railway to fully terminate the old container
+  await new Promise(function(r) { setTimeout(r, 5000); });
+  // Start polling with retry
+  var maxRetries = 10;
+  for (var a = 0; a < maxRetries; a++) {
     try {
       await bot.start({
         drop_pending_updates: true,
@@ -887,11 +889,11 @@ bot.on('message:text', async (ctx) => {
           console.log('🤖 Nova Bot started as @' + (info.username || 'unknown'));
         }
       });
-      return; // success
+      return;
     } catch (e) {
-      if (e.error_code === 409 || (e.message && e.message.indexOf('409') >= 0)) {
-        console.log('409 conflict, retrying in 3s (attempt ' + (attempt+1) + '/' + maxRetries + ')');
-        await new Promise(function(r) { setTimeout(r, 3000); });
+      if (e.error_code === 409) {
+        console.log('409 conflict, retry ' + (a+1) + '/' + maxRetries);
+        await new Promise(function(r) { setTimeout(r, 4000); });
       } else {
         throw e;
       }
