@@ -662,54 +662,6 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // --- /佣金 — show this month's total commission earned ---
-  if (cmd === '佣金') {
-    var chatId = String(ctx.chat.id);
-
-    var { data: cust } = await sb
-      .from('customers')
-      .select('id, name, public_id')
-      .eq('telegram_id', chatId)
-      .maybeSingle();
-
-    if (!cust) {
-      await ctx.reply('No customer bound. Use /vip first.');
-      return;
-    }
-
-    var thisMonth = getMonthStr(new Date());
-    var { data: comms } = await sb
-      .from('commissions')
-      .select('commission')
-      .eq('customer_id', cust.id)
-      .eq('month', thisMonth);
-
-    var total = 0;
-    if (comms) {
-      for (var ci2 = 0; ci2 < comms.length; ci2++) {
-        total += comms[ci2].commission;
-      }
-    }
-
-    // Subtract advances for this month
-    var { data: advs } = await sb
-      .from('transactions')
-      .select('amount')
-      .eq('customer_id', cust.id)
-      .eq('source', 'advance')
-      .gte('created_at', thisMonth + '-01')
-      .lt('created_at', getMonthStr(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)) + '-01');
-    var advTotal = 0;
-    if (advs) {
-      for (var ai2 = 0; ai2 < advs.length; ai2++) advTotal += advs[ai2].amount;
-    }
-    var net = total - advTotal;
-    if (net < 0) net = 0;
-    await ctx.reply('💰 This month commission: ₦' + net.toFixed(2) + ' (total: ₦' + total.toFixed(2) + ', advances: ₦' + advTotal.toFixed(2) + ')');
-    return;
-  }
-
-  // --- /预支 — create an advance record (deduct from commissions) ---
   if (cmd.startsWith('预支 ') && !cmd.startsWith('预支查询')) {
     var parts = cmd.split(/\s+/);
     var advAmount = parseFloat(parts[1]);
@@ -1044,7 +996,6 @@ bot.use(async (ctx, next) => {
       '/下发' + ''.padEnd(24) + '— 给当前客户加账\n' +
       '/撤回' + ''.padEnd(24) + '— 撤销上一次加账\n' +
       '/查账' + ''.padEnd(24) + '— 查看近 6 个月佣金状态 (含预支)\n' +
-      '/佣金' + ''.padEnd(24) + '— 查看本月赚取佣金总数\n' +
       '/预支' + ''.padEnd(24) + '— 创建预支记录并从佣金扣除\n' +
       '/预支查询' + ''.padEnd(20) + '— 查看预支记录及应付金额\n' +
       '/结算' + ''.padEnd(24) + '— 结算指定月份佣金\n' +
