@@ -742,7 +742,7 @@ bot.use(async (ctx, next) => {
 
             // Build table with double-space separators
     var out = [];
-    var hdr1 = '   ' + 'VIPID'.padEnd(12) + '                  ' + '日期'.padEnd(17) + '  ' + '总佣金'.padStart(10) + '  ' + '预支'.padStart(8) + '  ' + '应付金额';
+    var hdr1 = '    ' + 'VIPID'.padEnd(12) + '                  ' + '日期'.padEnd(17) + '  ' + '总佣金'.padStart(10) + '  ' + '预支'.padStart(8) + '    ' + '应付金额';
     out.push(hdr1);
     for (var ri = 0; ri < rows.length; ri++) {
       var vipD = cust.public_id.padEnd(12);
@@ -750,7 +750,7 @@ bot.use(async (ctx, next) => {
       var commD = String(totalComm).padStart(10);
       var advD = String(rows[ri].amt).padStart(10);
       var payD = String(rows[ri].pay);
-      out.push(vipD + '  ' + dateD + '  ' + commD + '  ' + advD + '  ' + '  ' + payD);
+      out.push(vipD + '  ' + dateD + '  ' + commD + '  ' + advD + '      ' + payD);
     }
     await ctx.reply(out.join('\n'));
     return;
