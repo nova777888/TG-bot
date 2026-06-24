@@ -33,7 +33,7 @@ async function ensureSubAdminsTable() {
   var dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) { console.log('[SUB_ADMIN] DATABASE_URL not set'); return false; }
   try {
-    var pool = new (require('pg').Pool)({ connectionString: dbUrl + (dbUrl.indexOf('?') >= 0 ? '&' : '?') + 'family=4', ssl: { rejectUnauthorized: false } });
+    var pool = new (require('pg').Pool)({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, family: 4 });
     await pool.query("CREATE TABLE IF NOT EXISTS public.sub_admins (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), telegram_id TEXT NOT NULL UNIQUE, customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT now(), created_by UUID REFERENCES public.customers(id) ON DELETE SET NULL);");
     await pool.query("ALTER TABLE public.sub_admins ENABLE ROW LEVEL SECURITY;").catch(function(){});
     await pool.end();
