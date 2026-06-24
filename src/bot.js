@@ -626,8 +626,66 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-  // --- /预支 — show advance records with running payable calculation ---
-  if (cmd === '预支') {
+  // --- /预支 — create an advance record (deduct from commissions) ---
+  if (cmd.startsWith('预支 ') && !cmd.startsWith('预支查询')) {
+    var advParts = cmd.split(/\s+/);
+    var advAmount = parseFloat(advParts[1]);
+
+    if (!advAmount || advAmount <= 0) {
+      await ctx.reply('Usage: /预支 5000');
+      return;
+    }
+
+    var chatId = String(ctx.chat.id);
+    var { data: cust } = await sb
+      .from('customers')
+      .select('id, name, public_id')
+      .eq('telegram_id', chatId)
+      .maybeSingle();
+
+    if (!cust) {
+      await ctx.reply('No customer bound. Use /vip first.');
+      return;
+    }
+
+    // Insert advance as a transaction with source=advance
+    var { error: insErr } = await sb.from('transactions').insert({
+      customer_id: cust.id,
+      amount: advAmount,
+      source: 'advance',
+      bank_account_id: null,
+      trade_date: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    });
+
+    if (insErr) {
+      await ctx.reply('❌ Failed to record advance: ' + insErr.message);
+      return;
+    }
+
+    // Deduct from customer_balances.available_balance
+    var { data: bal } = await sb
+      .from('customer_balances')
+      .select('*')
+      .eq('customer_id', cust.id)
+      .maybeSingle();
+
+    if (bal) {
+      var newBal = (bal.available_balance || 0) - advAmount;
+      if (newBal < 0) newBal = 0;
+      await sb.from('customer_balances')
+        .update({ available_balance: newBal, updated_at: new Date().toISOString() })
+        .eq('id', bal.id);
+    }
+
+    var remaining = bal ? (bal.available_balance - advAmount) : 0;
+    if (remaining < 0) remaining = 0;
+    await ctx.reply('✅ Advance recorded: ₦' + advAmount.toFixed(2) + '\n💰 Remaining: ₦' + remaining.toFixed(2));
+    return;
+  }
+
+  // --- /预支查询 — show advance records with running payable calculation ---
+  if (cmd === '预支查询') {
     var chatId = String(ctx.chat.id);
 
     var { data: cust } = await sb
@@ -794,7 +852,8 @@ bot.use(async (ctx, next) => {
       '/撤回 — 撤销上一次加账\n' +
       '/查账 — 查看近 6 个月佣金状态 (含预支)\n' +
       '/佣金 — 查看本月赚取佣金总数\n' +
-      '/预支 — 查看预支记录及应付金额\n' +
+      '/预支 5000 — 创建预支记录并从佣金扣除\n' +
+      '/预支查询 — 查看预支记录及应付金额\n' +
       '/结算 2026-5月 — 结算指定月份佣金\n' +
       '/bindbank — 绑定银行账户到当前聊天窗\n' +
       '/fixreferrer — 修正客户的推荐人（管理员）'
