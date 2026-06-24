@@ -648,7 +648,7 @@ bot.use(async (ctx, next) => {
     var advAmount = parseFloat(advParts[1]);
 
     if (!advAmount || advAmount <= 0) {
-      await ctx.reply('Usage: /预支 5000');
+      await ctx.reply('Usage: /预支 ');
       return;
     }
 
