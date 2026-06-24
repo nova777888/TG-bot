@@ -1,6 +1,7 @@
 const { Bot } = require('grammy');
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const { Pool } = require('pg');
 const WebSocket = require('ws');
 
 // ============================================================
@@ -21,6 +22,49 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
       realtime: { transport: WebSocket }
 });
+
+// ============================================================
+// Sub-admin in-memory cache
+// ============================================================
+var subAdminCache = {};
+var subAdminCacheTime = 0;
+
+async function ensureSubAdminsTable() {
+  var dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) { console.log('[SUB_ADMIN] DATABASE_URL not set'); return false; }
+  try {
+    var pool = new (require('pg').Pool)({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+    await pool.query("CREATE TABLE IF NOT EXISTS public.sub_admins (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), telegram_id TEXT NOT NULL UNIQUE, customer_id UUID REFERENCES public.customers(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT now(), created_by UUID REFERENCES public.customers(id) ON DELETE SET NULL);");
+    await pool.query("ALTER TABLE public.sub_admins ENABLE ROW LEVEL SECURITY;").catch(function(){});
+    await pool.end();
+    console.log('[SUB_ADMIN] Table ensured');
+    return true;
+  } catch (e) {
+    console.log('[SUB_ADMIN] Table creation failed:', e.message);
+    return false;
+  }
+}
+
+async function refreshSubAdminCache() {
+  try {
+    var { data } = await sb.from('sub_admins').select('telegram_id, customer_id, created_at');
+    if (data) {
+      subAdminCache = {};
+      for (var i = 0; i < data.length; i++) {
+        subAdminCache[data[i].telegram_id] = { customer_id: data[i].customer_id, created_at: data[i].created_at };
+      }
+    }
+    subAdminCacheTime = Date.now();
+    console.log('[SUB_ADMIN] Cache refreshed:', Object.keys(subAdminCache).length, 'sub-admins');
+  } catch (e) {
+    console.log('[SUB_ADMIN] Cache refresh failed:', e.message);
+  }
+}
+
+async function isSubAdmin(tgId) {
+  if (Date.now() - subAdminCacheTime > 60000) await refreshSubAdminCache();
+  return !!subAdminCache[String(tgId)];
+}
 
 // ============================================================
 // Phone helpers
@@ -132,8 +176,11 @@ bot.catch((err) => {
 bot.use(async (ctx, next) => {
   var userId = ctx.from && ctx.from.id;
   if (!ADMIN_TG_IDS.includes(userId)) {
-    await ctx.reply('⛔ Unauthorized');
-    return;
+    var isSub = await isSubAdmin(String(userId));
+    if (!isSub) {
+      await ctx.reply('⛔ Unauthorized');
+      return;
+    }
   }
   await next();
 });
@@ -824,6 +871,97 @@ bot.use(async (ctx, next) => {
   }
 
   
+  // --- /addadmin — add a sub-admin ---
+  if (cmd === 'addadmin' || cmd.startsWith('addadmin ')) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
+      await ctx.reply('⛔ Only main admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    if (parts.length < 2) {
+      await ctx.reply('Usage: /addadmin +2348012345678');
+      return;
+    }
+    var phone = normalizePhone(parts[1]);
+    var ph = hashPhone(phone);
+    var { data: cust } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
+    if (!cust) {
+      await ctx.reply('❌ Customer not found with phone ' + phone);
+      return;
+    }
+    var { data: existing } = await sb.from('sub_admins').select('id').eq('customer_id', cust.id).maybeSingle();
+    if (existing) {
+      await ctx.reply('⚠️ Already a sub-admin');
+      return;
+    }
+    var { data: custFull } = await sb.from('customers').select('telegram_id').eq('id', cust.id).maybeSingle();
+    if (!custFull || !custFull.telegram_id) {
+      await ctx.reply('❌ Customer has no telegram_id. Use /vip first.');
+      return;
+    }
+    var { error: insErr } = await sb.from('sub_admins').insert({
+      telegram_id: custFull.telegram_id,
+      customer_id: cust.id,
+      created_by: null
+    });
+    if (insErr) {
+      await ctx.reply('❌ Failed to add sub-admin: ' + insErr.message);
+      return;
+    }
+    await refreshSubAdminCache();
+    await ctx.reply('✅ Sub-admin added: ' + phone);
+    return;
+  }
+
+  // --- /removeadmin — remove a sub-admin ---
+  if (cmd === 'removeadmin' || cmd.startsWith('removeadmin ')) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
+      await ctx.reply('⛔ Only main admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    if (parts.length < 2) {
+      await ctx.reply('Usage: /removeadmin +2348012345678');
+      return;
+    }
+    var phone = normalizePhone(parts[1]);
+    var ph = hashPhone(phone);
+    var { data: cust } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
+    if (!cust) {
+      await ctx.reply('❌ Customer not found with phone ' + phone);
+      return;
+    }
+    var { error: delErr } = await sb.from('sub_admins').delete().eq('customer_id', cust.id);
+    if (delErr) {
+      await ctx.reply('❌ Failed to remove sub-admin: ' + delErr.message);
+      return;
+    }
+    await refreshSubAdminCache();
+    await ctx.reply('✅ Sub-admin removed: ' + phone);
+    return;
+  }
+
+  // --- /listadmin — list all sub-admins ---
+  if (cmd === 'listadmin') {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
+      await ctx.reply('⛔ Only main admin can use this');
+      return;
+    }
+    var { data: subs } = await sb.from('sub_admins').select('telegram_id, customer_id, created_at');
+    if (!subs || subs.length === 0) {
+      await ctx.reply('No sub-admins configured.');
+      return;
+    }
+    var lines = []; var n = 1;
+    for (var si = 0; si < subs.length; si++) {
+      var { data: c } = await sb.from('customers').select('public_id').eq('id', subs[si].customer_id).maybeSingle();
+      var pid = c ? c.public_id : '?';
+      lines.push(String(n++) + '. ' + pid + ' (TG:' + subs[si].telegram_id + ')');
+    }
+    await ctx.reply('📋 Sub-admins:\n' + lines.join('\n'));
+    return;
+  }
+
   // --- /帮助 or /指令 — show all commands ---
   if (cmd === '帮助' || cmd === '指令') {
     await ctx.reply(
@@ -875,6 +1013,9 @@ bot.on('message:text', async (ctx) => {
 (async () => {
   // Kill webhook & force close any existing polling sessions
   await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(function() {});
+  // Initialize sub-admins table
+  var tableOk = await ensureSubAdminsTable();
+  if (tableOk) await refreshSubAdminCache();
   // Set empty webhook to force-terminate old getUpdates
   await bot.api.setWebhook({ url: '' }).catch(function() {});
   // Wait for Railway to fully terminate the old container
@@ -901,3 +1042,5 @@ bot.on('message:text', async (ctx) => {
   }
   console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
+
+
