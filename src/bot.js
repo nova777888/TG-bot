@@ -873,14 +873,29 @@ bot.on('message:text', async (ctx) => {
 // ============================================================
 // Clear webhook then start
 (async () => {
-  // Forcefully reset any existing polling sessions
+  // Kill webhook first
   await bot.api.deleteWebhook({ drop_pending_updates: true }).catch(() => {});
-  // Close any stale getUpdates sessions
-  await bot.api.getUpdates({ offset: -1, timeout: 1 }).catch(() => {});
-  await bot.api.getUpdates({ offset: -2, timeout: 1 }).catch(() => {});
-  bot.start({
-    onStart: function(info) {
-      console.log('🤖 Nova Bot started as @' + (info.username || 'unknown'));
+  // Wait for old container to fully shut down
+  await new Promise(function(r) { setTimeout(r, 2000); });
+  // Retry loop: keep trying until we get past the 409 conflict
+  var maxRetries = 5;
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      await bot.start({
+        drop_pending_updates: true,
+        onStart: function(info) {
+          console.log('🤖 Nova Bot started as @' + (info.username || 'unknown'));
+        }
+      });
+      return; // success
+    } catch (e) {
+      if (e.message && e.message.indexOf('409') >= 0) {
+        console.log('409 conflict, retrying in 3s (attempt ' + (attempt+1) + '/' + maxRetries + ')');
+        await new Promise(function(r) { setTimeout(r, 3000); });
+      } else {
+        throw e;
+      }
     }
-  });
+  }
+  console.error('Failed to start after ' + maxRetries + ' attempts');
 })();
