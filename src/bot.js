@@ -643,15 +643,7 @@ bot.use(async (ctx, next) => {
   }
 
   // --- /预支 — create an advance record (deduct from commissions) ---
-  if (cmd.startsWith('预支 ') && !cmd.startsWith('预支查询')) {
-    var advParts = cmd.split(/\s+/);
-    var advAmount = parseFloat(advParts[1]);
-
-    if (!advAmount || advAmount <= 0) {
-      await ctx.reply('Usage: /预支 ');
-      return;
-    }
-
+  if (cmd === '预支') {
     var chatId = String(ctx.chat.id);
     var { data: cust } = await sb
       .from('customers')
@@ -664,10 +656,44 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Insert advance as a transaction with source=advance
+    // Get total unpaid commissions (all unsettled)
+    var { data: comms } = await sb
+      .from('commissions')
+      .select('commission, month')
+      .eq('customer_id', cust.id)
+      .eq('settled', false);
+
+    var totalAdvance = 0;
+    if (comms) {
+      for (var aci = 0; aci < comms.length; aci++) totalAdvance += comms[aci].commission;
+    }
+
+    if (totalAdvance <= 0) {
+      await ctx.reply('No unpaid commissions available for advance.');
+      return;
+    }
+
+    // Subtract already-advanced amounts
+    var { data: existingAdv } = await sb
+      .from('transactions')
+      .select('amount')
+      .eq('customer_id', cust.id)
+      .eq('source', 'advance');
+    var alreadyAdvanced = 0;
+    if (existingAdv) {
+      for (var eai = 0; eai < existingAdv.length; eai++) alreadyAdvanced += existingAdv[eai].amount;
+    }
+
+    var availableAdvance = totalAdvance - alreadyAdvanced;
+    if (availableAdvance <= 0) {
+      await ctx.reply('All commissions already advanced.');
+      return;
+    }
+
+    // Record the advance
     var { error: insErr } = await sb.from('transactions').insert({
       customer_id: cust.id,
-      amount: advAmount,
+      amount: availableAdvance,
       source: 'advance',
       bank_account_id: SYSTEM_BANK_ID,
       trade_date: new Date().toISOString(),
@@ -679,13 +705,9 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-
-    await ctx.reply('✅ Advance recorded: ₦' + advAmount.toFixed(2) + '\n💳 Deducted from future commissions');
-
+    await ctx.reply('✅ Advance recorded: ₦' + availableAdvance.toFixed(2) + '\n💳 Deducted from future commissions');
     return;
-  }
-
-    // --- /预支查询 — show advance records ---
+  }  // --- /预支查询 — show advance records ---
   if (cmd === '预支查询') {
     var chatId = String(ctx.chat.id);
 
@@ -829,7 +851,7 @@ bot.use(async (ctx, next) => {
       '/撤回 — 撤销上一次加账\n' +
       '/查账 — 查看近 6 个月佣金状态 (含预支)\n' +
       '/佣金 — 查看本月赚取佣金总数\n' +
-      '/预支 5000 — 创建预支记录并从佣金扣除\n' +
+      '/预支 — 创建预支记录并从佣金扣除\n' +
       '/预支查询 — 查看预支记录及应付金额\n' +
       '/结算 2026-5月 — 结算指定月份佣金\n' +
       '/bindbank — 绑定银行账户到当前聊天窗\n' +
