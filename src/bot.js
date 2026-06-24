@@ -740,21 +740,17 @@ bot.use(async (ctx, next) => {
     // Display newest first
     rows.reverse();
 
-            // Build pipe-delimited table for alignment
-    var sep = ' | ';
-    var vipH = 'VIPID'.padEnd(12);
-    var dateH = '日期'.padEnd(22);
-    var commH = '总佣金'.padStart(10);
-    var advH = '预支'.padStart(8);
-    var payH = '应付金额'.padEnd(22);
-    var out = [hdr1];
+            // Build table with double-space separators
+    var out = [];
+    var hdr1 = 'VIPID'.padEnd(12) + '  ' + '日期'.padEnd(22) + '  ' + '总佣金'.padStart(10) + '  ' + '预支'.padStart(8) + '  ' + '应付金额';
+    out.push(hdr1);
     for (var ri = 0; ri < rows.length; ri++) {
       var vipD = cust.public_id.padEnd(12);
       var dateD = rows[ri].ts.padEnd(22);
       var commD = String(totalComm).padStart(10);
       var advD = String(rows[ri].amt).padStart(8);
-      var payD = String(rows[ri].pay).padEnd(22);
-      out.push(vipD + sep + dateD + sep + commD + sep + advD + sep + payD);
+      var payD = String(rows[ri].pay);
+      out.push(vipD + '  ' + dateD + '  ' + commD + '  ' + advD + '  ' + payD);
     }
     await ctx.reply(out.join('\n'));
     return;
