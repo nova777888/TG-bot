@@ -7,11 +7,16 @@
     "start": "node src/bot.js"
   },
   "dependencies": {
-    "grammy": "^1.20.0",
     "@supabase/supabase-js": "^2.108.2",
+    "grammy": "^1.20.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.22.0",
     "ws": "^8.16.0"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "supabase": "^2.107.0"
   }
 }

@@ -567,12 +567,14 @@ bot.use(async (ctx, next) => {
       var isCurrentMonth = (mi2 === 0);
       var state = isCurrentMonth ? '🔒 Locking' : (allSettled ? '✅ Settled' : '⏳ Unsettled');
 
-      // Query advances for this month
+      // Query advances (transactions with source='advance') for this month
       var { data: advs } = await sb
-        .from('advances')
+        .from('transactions')
         .select('amount')
         .eq('customer_id', cust.id)
-        .eq('month', m.str);
+        .eq('source', 'advance')
+        .gte('created_at', m.str + '-01')
+        .lt('created_at', getMonthStr(new Date(m.dt.getFullYear(), m.dt.getMonth() + 1, 1)) + '-01');
       var advTotal = 0;
       if (advs) {
         for (var ai = 0; ai < advs.length; ai++) advTotal += advs[ai].amount;
@@ -639,11 +641,12 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Get all advances for this customer, ordered by created_at DESC
+    // Get all advances (transactions with source='advance'), ordered by created_at DESC
     var { data: advances, error: advErr } = await sb
-      .from('advances')
-      .select('amount, created_at, month')
+      .from('transactions')
+      .select('amount, created_at')
       .eq('customer_id', cust.id)
+      .eq('source', 'advance')
       .order('created_at', { ascending: false });
 
     if (advErr) {
@@ -661,7 +664,7 @@ bot.use(async (ctx, next) => {
     // Build month -> total commission map
     var monthComms = {};
     for (var ai2 = 0; ai2 < advances.length; ai2++) {
-      var mStr = advances[ai2].month || getMonthStr(new Date(advances[ai2].created_at));
+      var mStr = getMonthStr(new Date(advances[ai2].created_at));
       if (!monthComms[mStr]) {
         var { data: mComms } = await sb
           .from('commissions')
@@ -683,7 +686,7 @@ bot.use(async (ctx, next) => {
     var displayRows = [];
     for (var avi = chrons.length - 1; avi >= 0; avi--) {
       var a = chrons[avi];
-      var mS = a.month || getMonthStr(new Date(a.created_at));
+      var mS = getMonthStr(new Date(a.created_at));
       var totalCommMonth = monthComms[mS] || 0;
       runningAdv += a.amount;
       var payable = totalCommMonth - runningAdv;
