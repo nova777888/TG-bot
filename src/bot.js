@@ -594,10 +594,43 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Delete related commissions and transaction
-    if (last.tx_id) {
-      try { await sb.from('commissions').delete().eq('from_transaction_id', last.tx_id); } catch(e) { console.error('[UNDO] Commissions delete:', e.message); }
-      try { await sb.from('transactions').delete().eq('id', last.tx_id); } catch(e) { console.error('[UNDO] Transaction delete:', e.message); }
+    var bankId2 = await ensureSystemBankAccount();
+    var revId = crypto.randomUUID();
+
+    // Create reversal transaction (negative amount)
+    try { await sb.from('transactions').insert({
+      id: revId,
+      customer_id: last.customer_id,
+      bank_account_id: bankId2,
+      amount: -last.amount,
+      source: 'reversal',
+      trade_date: new Date().toISOString()
+    }); } catch(e) { console.error('[UNDO] Reversal TX error:', e.message); }
+
+    // Create reversal commissions (negative)
+    var { data: custInfo } = await sb.from('customers').select('id, parent_id').eq('id', last.customer_id).maybeSingle();
+    if (custInfo) {
+      var rates2 = [0.01, 0.005, 0.003, 0.002];
+      var curPid2 = custInfo.parent_id;
+      for (var lv = 0; lv < 4; lv++) {
+        if (!curPid2) break;
+        var { data: p2 } = await sb.from('customers').select('id, parent_id').eq('id', curPid2).maybeSingle();
+        if (!p2) break;
+        var revComm = Math.round(last.amount * rates2[lv] * 100) / 100;
+        if (revComm > 0) {
+          try { await sb.from('commissions').insert({
+            customer_id: p2.id,
+            from_customer_id: last.customer_id,
+            from_transaction_id: revId,
+            amount: -last.amount,
+            rate: rates2[lv],
+            commission: -revComm,
+            month: getMonthStr(new Date()),
+            settled: false
+          }); } catch(e) { console.error('[UNDO] Reversal commission error:', e.message); }
+        }
+        curPid2 = p2.parent_id;
+      }
     }
 
     var { error: updateErr } = await sb
@@ -606,12 +639,13 @@ bot.use(async (ctx, next) => {
       .eq('customer_id', last.customer_id);
 
     if (updateErr) {
-      await ctx.reply('❌ Failed to undo: ' + updateErr.message);
+      await ctx.reply('\u2755 Failed to undo: ' + updateErr.message);
       return;
     }
 
     delete lastCredit[chatId];
     await ctx.reply('↩️ Undid +' + last.amount);
+    return;
     return;
   }
 
