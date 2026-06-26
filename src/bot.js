@@ -470,7 +470,7 @@ bot.hears(/^\/?下发\s*(\d+)$/, async (ctx) => {
   }
 
   // Track for undo
-  lastCredit[chatId] = { amount: amount, customer_id: customer.id, prev_balance: bal ? bal.available_balance : 0 };
+  lastCredit[chatId] = { amount: amount, customer_id: customer.id, tx_id: txId, prev_balance: bal ? bal.available_balance : 0 };
 
   // Build reply — phone display
   var phoneDisplay = '📞 Bound';
@@ -604,7 +604,7 @@ bot.use(async (ctx, next) => {
     }
 
     delete lastCredit[chatId];
-    await ctx.reply('↩️ Undid +' + last.amount + ' (balance restored to ' + last.prev_balance + ')');
+    await ctx.reply('↩️ Undid +' + last.amount);
     return;
   }
 

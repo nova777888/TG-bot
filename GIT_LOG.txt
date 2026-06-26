@@ -1,0 +1,30 @@
+51b65ec fix: remove blank line between phone and Commission Status in /查账
+c5be1e6 fix: remove phone from /下发 output; swap order in /查账 (VIP first, phone second)
+dfef51b fix: header spacing increased, data output unchanged
+31b1bde fix: revert /查账 header spacing to original
+f14739e fix: /查账 header spacing +7 Date +3 Amount +8 State; /下发 commission deducts advances
+fbf34f2 Revert "fix: /查账 header spacing +7 Date +3 Amount +8 State; /下发 commission subtract advances"
+fa4e4e4 fix: /查账 header spacing +7 Date +3 Amount +8 State; /下发 commission subtract advances
+dd1cbbb fix: precise column alignment in /查账
+77b21fd fix: reformat /查账 output with aligned columns
+4464476 feat: show phone number at top of /查账 output
+ba8d4d0 fix: add missing encryptPhone function
+fcdda15 fix: add missing encryptPhone function
+f396455 fix: remove /佣金 command
+8c9b921 feat: add /注册 command to register customer by phone directly
+9409761 fix: /添加管理 and /删除管理 accept phone with spaces (+852 5 796 1554)
+cc25045 fix: allow space in /下发 1000 (now accepts both /下发1000 and /下发 1000)
+f3bb4c7 fix: /佣金 deducts advances, /下发 regex verified
+fb0a6c0 fix: /佣金 now properly deducts advances
+ac8f4ef fix: /佣金 now deducts advances; verify /下发 regex
+c0b0f4a feat: rename commands to Chinese /添加管理 /删除管理 /查看管理
+50704be fix: use Supabase REST API instead of direct pg for sub_admins
+fa4db3d fix: use Pool config family:4 instead of query param
+6ea153c fix: force IPv4 for pg connection to Supabase DB
+fd72b9d feat: sub-admin system with /addadmin /removeadmin /listadmin
+390a3b8 fix: align ALL commands — to 29 visual chars (Chinese=2)
+8f954bd fix: command list — aligned to 29 chars from /
+38f5024 fix: replace 4 spaces with -- before VIPID header
+8fcd9db fix: add setWebhook('') to force-terminate old getUpdates before starting
+1895a40 fix: check e.error_code for 409 conflict in retry loop
+84ab0e9 fix: add 409 conflict retry loop on startup
