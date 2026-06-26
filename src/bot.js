@@ -420,8 +420,6 @@ bot.hears(/^\/?fixreferrer(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
     );
     return;
   }
-    
-    }
 
   var { error: updateErr } = await sb
     .from("customers")
