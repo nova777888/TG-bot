@@ -420,6 +420,9 @@ bot.hears(/^\/?fixreferrer(?:@\w+)?(?:\s+(.+))?$/, async (ctx) => {
     );
     return;
   }
+    
+    }
+
   var { error: updateErr } = await sb
     .from("customers")
     .update({ parent_id: referrer.id, referrer_locked: true })
@@ -591,6 +594,12 @@ bot.use(async (ctx, next) => {
     if (!last) {
       await ctx.reply('Nothing to undo.');
       return;
+    }
+
+    // Delete related commissions and transaction
+    if (last.tx_id) {
+      try { await sb.from('commissions').delete().eq('from_transaction_id', last.tx_id); } catch(e) { console.error('[UNDO] Commissions delete:', e.message); }
+      try { await sb.from('transactions').delete().eq('id', last.tx_id); } catch(e) { console.error('[UNDO] Transaction delete:', e.message); }
     }
 
     var { error: updateErr } = await sb
