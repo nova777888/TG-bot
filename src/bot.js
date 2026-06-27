@@ -681,7 +681,7 @@ bot.use(async (ctx, next) => {
     var lines_out = ['💎 ' + cust.public_id + '  |  📞 ' + phoneDisplay];
     lines_out.push('━━━━━━━━━━━━━━━━━━━━━━');
     lines_out.push('📋 Commission Status\n');
-    lines_out.push('Month' + ''.padEnd(8) + 'Commission(₦)' + ''.padEnd(5) + 'Status');
+    lines_out.push('Month' + ''.padEnd(8) + '        Commission(₦)' + ''.padEnd(5) + 'Status');
     lines_out.push('───────────────────────────────────────');
     for (var mi2 = 0; mi2 < months.length; mi2++) {
       var m = months[mi2];
