@@ -664,7 +664,6 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // Generate last 6 months
     var now = new Date();
     var months = [];
     for (var mi = 0; mi < 6; mi++) {
@@ -672,12 +671,18 @@ bot.use(async (ctx, next) => {
       months.push({ str: getMonthStr(d), dt: d });
     }
 
-    // Query commissions per month
     var phoneDisplay = 'N/A';
     if (cust.phone_encrypted) {
       try { phoneDisplay = decryptPhone(cust.phone_encrypted); } catch(e) {}
     }
-    var lines_out = ['💎 ' + cust.public_id + '\n📞 ' + phoneDisplay + '\n📋 Commission Status\n'];
+    function fmtNum(n) {
+      return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    var lines_out = ['💎 ' + cust.public_id + '  |  📞 ' + phoneDisplay];
+    lines_out.push('━━━━━━━━━━━━━━━━━━━━━━━━');
+    lines_out.push('📋 佣金状态\n');
+    lines_out.push(' 月份         佣金(₦)         状态');
+    lines_out.push('─────────────────────────────');
     for (var mi2 = 0; mi2 < months.length; mi2++) {
       var m = months[mi2];
       var { data: comms } = await sb
@@ -686,7 +691,7 @@ bot.use(async (ctx, next) => {
         .eq('customer_id', cust.id)
         .eq('month', m.str);
 
-      if (!comms || comms.length === 0) continue; // skip months with no commissions
+      if (!comms || comms.length === 0) continue;
 
       var totalComm = 0;
       var allSettled = true;
@@ -699,37 +704,14 @@ bot.use(async (ctx, next) => {
       var mo = parseInt(m.str.substring(5, 7), 10);
       var label = y + '-' + mo + '月';
 
-      // Check if current month
       var isCurrentMonth = (mi2 === 0);
-      var state = isCurrentMonth ? '🔒 Locking' : (allSettled ? '✅ Settled' : '⏳ Unsettled');
+      var state = isCurrentMonth ? '🔒 锁定中' : (allSettled ? '✅ 已结算' : '⏳ 未结算');
 
-      // Query advances (transactions with source='advance') for this month
-      var { data: advs } = await sb
-        .from('transactions')
-        .select('amount')
-        .eq('customer_id', cust.id)
-        .eq('source', 'advance')
-        .gte('created_at', m.str + '-01')
-        .lt('created_at', getMonthStr(new Date(m.dt.getFullYear(), m.dt.getMonth() + 1, 1)) + '-01');
-      var advTotal = 0;
-      if (advs) {
-        for (var ai = 0; ai < advs.length; ai++) advTotal += advs[ai].amount;
-      }
-      var advanceYesNo = advTotal > 0 ? 'Yes' : 'No';
-
-      // Amount payable = commission - advance for this month
-      var amtPayable = totalComm - advTotal;
-      var amtStr = '₦' + amtPayable.toFixed(2);
-
-      var hdr = '--VIPID' + '               ' + 'Date' + '          ' + 'Amount' + '                   ' + 'State' + '       ' + 'Advance amount';
-      if (mi2 === 0) lines_out.push(hdr);
-      var vipD = cust.public_id.padEnd(13);
-      var dateD = label.padEnd(11);
-      var amtD = amtStr.padStart(10);
-      lines_out.push('  ' + vipD + dateD + amtD + ''.padEnd(7) + state + '             ' + advanceYesNo);
+      var amtStr = '₦' + fmtNum(totalComm);
+      lines_out.push(' ' + label.padEnd(11) + amtStr.padStart(16) + '     ' + state);
     }
 
-    lines_out.push('\n⚠️ The commission for the current month cannot be settled and must wait until the next month for settlement.');
+    lines_out.push('\n⚠️ 本月佣金次月方可结算');
     await ctx.reply(lines_out.join('\n'));
     return;
   }
@@ -1092,7 +1074,7 @@ bot.use(async (ctx, next) => {
         phoneDisplay = decryptPhone(cust.phone_encrypted);
       } catch(e) { phoneDisplay = 'Error'; }
     }
-    await ctx.reply('📞 Phone: ' + phoneDisplay + '\n💎 VIP ID: ' + cust.public_id + '\n👤 Name: ' + (cust.name || 'N/A') + '\n✉️ Email: ' + (cust.bound_email || 'Not bound'));
+    await ctx.reply('📞 Phone: ' + phoneDisplay + '\n💎 VIP ID: ' + cust.public_id + '\n👤 Name: ' + (cust.name || 'N/A') + '\n✉️ Email: ' + (cust.bound_email || cust.email || 'Not bound'));
     return;
   }
 
