@@ -1062,7 +1062,7 @@ bot.use(async (ctx, next) => {
     var chatId = String(ctx.chat.id);
     var { data: cust } = await sb
       .from('customers')
-      .select('id, name, public_id, phone_encrypted, telegram_id, bound_email')
+      .select('id, name, public_id, phone_encrypted, telegram_id, bound_email, email')
       .eq('telegram_id', chatId)
       .maybeSingle();
     if (!cust) {
