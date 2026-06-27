@@ -708,7 +708,7 @@ bot.use(async (ctx, next) => {
       var state = isCurrentMonth ? '🔒 Locking' : (allSettled ? '✅ Settled' : '⏳ Unsettled');
 
       var amtStr = '₦' + fmtNum(totalComm);
-      lines_out.push(label.padEnd(13) + amtStr.padStart(18) + '  ' + state);
+      lines_out.push(label.padEnd(13) + amtStr.padStart(18) + '       ' + state);
     }
 
     lines_out.push('\n⚠️ Current month commission settles next month');
