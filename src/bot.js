@@ -1079,7 +1079,7 @@ bot.use(async (ctx, next) => {
     var chatId = String(ctx.chat.id);
     var { data: cust } = await sb
       .from('customers')
-      .select('id, name, public_id, phone_encrypted, telegram_id')
+      .select('id, name, public_id, phone_encrypted, telegram_id, bound_email')
       .eq('telegram_id', chatId)
       .maybeSingle();
     if (!cust) {
@@ -1092,7 +1092,7 @@ bot.use(async (ctx, next) => {
         phoneDisplay = decryptPhone(cust.phone_encrypted);
       } catch(e) { phoneDisplay = 'Error'; }
     }
-    await ctx.reply('📞 Phone: ' + phoneDisplay + '\n💎 VIP ID: ' + cust.public_id + '\n👤 Name: ' + (cust.name || 'N/A'));
+    await ctx.reply('📞 Phone: ' + phoneDisplay + '\n💎 VIP ID: ' + cust.public_id + '\n👤 Name: ' + (cust.name || 'N/A') + '\n✉️ Email: ' + (cust.bound_email || 'Not bound'));
     return;
   }
 
