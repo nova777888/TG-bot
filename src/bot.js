@@ -824,7 +824,9 @@ bot.use(async (ctx, next) => {
       var payable = totalComm - runningSum;
       if (payable < 0) payable = 0;
       var d = new Date(sorted[i].created_at);
-      var ts = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+      // Convert UTC to Beijing time (UTC+8)
+      var bj = new Date(d.getTime() + 8 * 60 * 60 * 1000);
+      var ts = bj.getUTCFullYear() + '-' + String(bj.getUTCMonth()+1).padStart(2,'0') + '-' + String(bj.getUTCDate()).padStart(2,'0') + ' ' + String(bj.getUTCHours()).padStart(2,'0') + ':' + String(bj.getUTCMinutes()).padStart(2,'0') + ':' + String(bj.getUTCSeconds()).padStart(2,'0');
       rows.push({ ts: ts, amt: sorted[i].amount, pay: payable, cum: runningSum });
     }
 
