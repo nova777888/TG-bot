@@ -862,10 +862,23 @@ bot.use(async (ctx, next) => {
       return;
     }
 
+    // Get bound customer for this chat
+    var chatId = String(ctx.chat.id);
+    var { data: boundCust } = await sb
+      .from('customers')
+      .select('id')
+      .eq('telegram_id', chatId)
+      .maybeSingle();
+    if (!boundCust) {
+      await ctx.reply('No customer bound to this chat. Use /vip +2348012345678 first.');
+      return;
+    }
+
     var { data: pending, error: fetchErr } = await sb
       .from('commissions')
       .select('id, commission, customer_id')
       .eq('settled', false)
+      .eq('customer_id', boundCust.id)
       .eq('month', targetMonth);
 
     if (fetchErr) {
