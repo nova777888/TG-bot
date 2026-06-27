@@ -650,7 +650,7 @@ bot.use(async (ctx, next) => {
   }
 
   // --- /查账 — show 6-month commission status ---
-  if (cmd === '查账') {
+    if (cmd === '查账') {
     var chatId = String(ctx.chat.id);
 
     var { data: cust } = await sb
@@ -679,10 +679,10 @@ bot.use(async (ctx, next) => {
       return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     }
     var lines_out = ['💎 ' + cust.public_id + '  |  📞 ' + phoneDisplay];
-    lines_out.push('━━━━━━━━━━━━━━━━━━━━━━━━');
-    lines_out.push('📋 佣金状态\n');
-    lines_out.push(' 月份         佣金(₦)         状态');
-    lines_out.push('─────────────────────────────');
+    lines_out.push('━━━━━━━━━━━━━━━━━━━━━━');
+    lines_out.push('📋 Commission Status\n');
+    lines_out.push('Month' + ''.padEnd(8) + 'Commission(₦)' + ''.padEnd(5) + 'Status');
+    lines_out.push('───────────────────────────────────────');
     for (var mi2 = 0; mi2 < months.length; mi2++) {
       var m = months[mi2];
       var { data: comms } = await sb
@@ -705,16 +705,17 @@ bot.use(async (ctx, next) => {
       var label = y + '-' + mo + '月';
 
       var isCurrentMonth = (mi2 === 0);
-      var state = isCurrentMonth ? '🔒 锁定中' : (allSettled ? '✅ 已结算' : '⏳ 未结算');
+      var state = isCurrentMonth ? '🔒 Locking' : (allSettled ? '✅ Settled' : '⏳ Unsettled');
 
       var amtStr = '₦' + fmtNum(totalComm);
-      lines_out.push(' ' + label.padEnd(11) + amtStr.padStart(16) + '     ' + state);
+      lines_out.push(label.padEnd(13) + amtStr.padStart(18) + '  ' + state);
     }
 
-    lines_out.push('\n⚠️ 本月佣金次月方可结算');
+    lines_out.push('\n⚠️ Current month commission settles next month');
     await ctx.reply(lines_out.join('\n'));
     return;
   }
+
 
   if (cmd.startsWith('预支 ') && !cmd.startsWith('预支查询')) {
     var parts = cmd.split(/\s+/);
