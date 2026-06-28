@@ -913,20 +913,28 @@ bot.use(async (ctx, next) => {
   }
 
   
-  // --- /添加管理 — add a sub-admin by TG ID ---
+  // --- /添加管理 — add a sub-admin by TG ID or reply ---
   if (cmd === '添加管理' || cmd.startsWith('添加管理 ')) {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
       return;
     }
+    var tgId = '';
     var parts = text.split(/\s+/);
-    if (parts.length < 2) {
-      await ctx.reply('Usage: /添加管理 123456789');
-      return;
+    if (parts.length >= 2) {
+      tgId = parts[1].replace(/[^\d]/g, '');
     }
-    var tgId = parts[1].replace(/[^\d]/g, '');
+    // If replied to a message, use the replied sender's ID
+    if (!tgId && ctx.message.reply_to_message) {
+      tgId = String(ctx.message.reply_to_message.from.id);
+    }
+    // If still no tgId, try to find it in the replied message text
+    if (!tgId && ctx.message.reply_to_message && ctx.message.reply_to_message.text) {
+      var mt = ctx.message.reply_to_message.text.replace(/[^\d]/g, '');
+      if (mt.length > 5) tgId = mt;
+    }
     if (!tgId) {
-      await ctx.reply('❌ Invalid Telegram ID');
+      await ctx.reply('Usage: /添加管理 123456789  or reply to someone's message with /添加管理');
       return;
     }
     var { data: existing } = await sb.from('sub_admins').select('id').eq('telegram_id', tgId).maybeSingle();
@@ -947,7 +955,7 @@ bot.use(async (ctx, next) => {
     return;
   }
 
-    //   // --- /删除管理 — remove a sub-admin by TG ID ---
+    // --- /删除管理 — remove a sub-admin by TG ID ---
   if (cmd === '删除管理' || cmd.startsWith('删除管理 ')) {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
