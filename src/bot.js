@@ -1079,6 +1079,190 @@ bot.use(async (ctx, next) => {
     return;
   }
 
+
+  // --- /检查号码 — check if a phone has a referrer ---
+  if (cmd === '检查号码' || cmd.startsWith('检查号码 ')) {
+    if (!isAdmin(ctx.from.id)) {
+      await ctx.reply('⛔ Only admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    if (parts.length < 2) {
+      await ctx.reply('Usage: /检查号码 +2348012345678');
+      return;
+    }
+    var phoneRaw = parts.slice(1).join('');
+    var phone = normalizePhone(phoneRaw);
+    var ph = hashPhone(phone);
+    var { data: cust } = await sb.from('customers').select('id, public_id, parent_id, name').eq('phone_hash', ph).maybeSingle();
+    if (!cust) {
+      await ctx.reply('❌ Customer not found with phone ' + phone);
+      return;
+    }
+    if (cust.parent_id) {
+      var { data: ref } = await sb.from('customers').select('public_id, name').eq('id', cust.parent_id).maybeSingle();
+      var refStr = ref ? ref.public_id + ' (' + ref.name + ')' : 'ID:' + cust.parent_id;
+      await ctx.reply('✅ ' + cust.public_id + ' ' + phone + '\n⬆ Has referrer: ' + refStr);
+    } else {
+      await ctx.reply('✅ ' + cust.public_id + ' ' + phone + '\n❌ No referrer. Can be set as agent.');
+    }
+    return;
+  }
+
+  // --- /添加代理 — create an agent with AGTXXXX ID ---
+  if (cmd === '添加代理' || cmd.startsWith('添加代理 ')) {
+    if (!isAdmin(ctx.from.id)) {
+      await ctx.reply('⛔ Only admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    if (parts.length < 3) {
+      await ctx.reply('Usage: /添加代理 +2348012345678 AGT0001');
+      return;
+    }
+    var phoneRaw = parts[1];
+    var agentId = parts[2].toUpperCase();
+    var phone = normalizePhone(phoneRaw);
+    var ph = hashPhone(phone);
+
+    // Validate AGT format
+    if (!/^AGT\d{4}$/.test(agentId)) {
+      await ctx.reply('❌ Agent ID must be AGT followed by 4 digits (e.g. AGT0001)');
+      return;
+    }
+
+    // Check if customer exists
+    var { data: cust } = await sb.from('customers').select('id, public_id, parent_id').eq('phone_hash', ph).maybeSingle();
+    if (!cust) {
+      await ctx.reply('❌ Customer not found with phone ' + phone);
+      return;
+    }
+
+    // Check if agent ID already taken
+    var { data: existingAgent } = await sb.from('customers').select('id').eq('agent_id', agentId).maybeSingle();
+    if (existingAgent) {
+      await ctx.reply('❌ Agent ID ' + agentId + ' already has an owner');
+      return;
+    }
+
+    // Check if customer has referrer - if so, warn
+    if (cust.parent_id) {
+      var { data: ref } = await sb.from('customers').select('public_id').eq('id', cust.parent_id).maybeSingle();
+      await ctx.reply('⚠️ ' + cust.public_id + ' has referrer ' + (ref ? ref.public_id : '?') + '.\nAs agent owner, they will NOT earn referral commissions from group transactions. Proceed anyway?\nSend /确认代理 ' + phone + ' ' + agentId + ' to confirm.');
+      return;
+    }
+
+    // No referrer, proceed directly
+    var { error: updErr } = await sb.from('customers').update({ is_agent: true, agent_id: agentId, agent_commission_rate: 2.00 }).eq('id', cust.id);
+    if (updErr) {
+      await ctx.reply('❌ Failed: ' + updErr.message);
+      return;
+    }
+    await ctx.reply('✅ Agent created!\n' + cust.public_id + ' ' + phone + '\n🏦 Agent ID: ' + agentId + '\n💰 Rate: 2% of monthly volume');
+    return;
+  }
+
+  // --- /确认代理 — confirm agent creation even with referrer ---
+  if (cmd === '确认代理' || cmd.startsWith('确认代理 ')) {
+    if (!isAdmin(ctx.from.id)) {
+      await ctx.reply('⛔ Only admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    if (parts.length < 3) {
+      await ctx.reply('Usage: /确认代理 +2348012345678 AGT0001');
+      return;
+    }
+    var phoneRaw = parts[1];
+    var agentId = parts[2].toUpperCase();
+    var phone = normalizePhone(phoneRaw);
+    var ph = hashPhone(phone);
+
+    var { data: cust } = await sb.from('customers').select('id, public_id').eq('phone_hash', ph).maybeSingle();
+    if (!cust) {
+      await ctx.reply('❌ Customer not found');
+      return;
+    }
+
+    var { error: updErr } = await sb.from('customers').update({ is_agent: true, agent_id: agentId, agent_commission_rate: 2.00 }).eq('id', cust.id);
+    if (updErr) {
+      await ctx.reply('❌ Failed: ' + updErr.message);
+      return;
+    }
+    await ctx.reply('✅ Agent created (with referrer)!\n' + cust.public_id + ' ' + phone + '\n🏦 Agent ID: ' + agentId);
+    return;
+  }
+
+  // --- /代理报表 — view agent monthly report ---
+  if (cmd === '代理报表' || cmd.startsWith('代理报表 ')) {
+    if (!isAdmin(ctx.from.id)) {
+      await ctx.reply('⛔ Only admin can use this');
+      return;
+    }
+    var parts = text.split(/\s+/);
+    var targetMonth = '';
+    if (parts.length >= 2) {
+      targetMonth = parts[1];
+    } else {
+      // Default to current month
+      var now = new Date();
+      var y = now.getFullYear();
+      var m = String(now.getMonth() + 1).padStart(2, '0');
+      targetMonth = y + '-' + m;
+    }
+
+    // If specific agent requested
+    if (parts.length >= 3) {
+      var agentId = parts[2].toUpperCase();
+      var { data: agent } = await sb.from('customers').select('id, public_id, agent_id, agent_commission_rate, phone_encrypted').eq('agent_id', agentId).maybeSingle();
+      if (!agent) {
+        await ctx.reply('❌ Agent ' + agentId + ' not found');
+        return;
+      }
+      var agentPhone = 'N/A';
+      if (agent.phone_encrypted) {
+        try { agentPhone = decryptPhone(agent.phone_encrypted); } catch(e) {}
+      }
+      // Get all transactions from customers under this agent
+      var { data: txns } = await sb.from('transactions').select('amount, created_at').gte('created_at', targetMonth + '-01').lt('created_at', targetMonth + '-31');
+      if (!txns) txns = [];
+      var total = 0;
+      for (var ti = 0; ti < txns.length; ti++) {
+        if (txns[ti].amount > 0) total += txns[ti].amount;
+      }
+      var rate = agent.agent_commission_rate || 2;
+      var payable = total * rate / 100;
+      await ctx.reply(
+        '🏦 Agent Report: ' + agentId + '\n' +
+        '📞 ' + agentPhone + '\n' +
+        '📅 Month: ' + targetMonth + '\n' +
+        '💰 Total Volume: ₦' + Number(total).toLocaleString() + '\n' +
+        '📈 Rate: ' + rate + '%\n' +
+        '✅ Payable: ₦' + Number(payable).toLocaleString()
+      );
+      return;
+    }
+
+    // List all agents
+    var { data: agents } = await sb.from('customers').select('id, public_id, agent_id, agent_commission_rate').eq('is_agent', true);
+    if (!agents || agents.length === 0) {
+      await ctx.reply('No agents found.');
+      return;
+    }
+    var lines = ['🏦 Agent Report: ' + targetMonth, ''];
+    for (var ai = 0; ai < agents.length; ai++) {
+      var ag = agents[ai];
+      var { data: txns } = await sb.from('transactions').select('amount').gte('created_at', targetMonth + '-01').lt('created_at', targetMonth + '-31');
+      var t = 0;
+      if (txns) for (var tj = 0; tj < txns.length; tj++) { if (txns[tj].amount > 0) t += txns[tj].amount; }
+      var r = ag.agent_commission_rate || 2;
+      lines.push(ag.agent_id + ' ' + ag.public_id + ' | Vol: ₦' + Number(t).toLocaleString() + ' | Pay: ₦' + Number(t*r/100).toLocaleString());
+    }
+    await ctx.reply(lines.join('\n'));
+    return;
+  }
+
+
   // --- /帮助 or /指令 — show all commands ---
   if (cmd === '帮助' || cmd === '指令') {
     await ctx.reply(
@@ -1097,7 +1281,7 @@ bot.use(async (ctx, next) => {
       '/删除管理' + ''.padEnd(20) + '— 移除子管理员\n' +
       '/查看管理' + ''.padEnd(20) + '— 查看所有子管理员\n' +
       '/bindbank' + ''.padEnd(20) + '— 绑定银行账户到当前聊天窗\n' +
-      '/fixreferrer' + ''.padEnd(17) + '— 修正客户的推荐人（管理员）'
+      '/fixreferrer' + ''.padEnd(17) + '— 修正客户的推荐人（管理员）' + '\n' + \n      '/检查号码' + ''.padEnd(18) + '— 查询号码是否有推荐人\n' + \n      '/添加代理' + ''.padEnd(18) + '— 将客户升级为代理\n' + \n      '/代理报表' + ''.padEnd(18) + '— 查看代理月度报表'
     );
     return;
   }
