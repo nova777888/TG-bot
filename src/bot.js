@@ -913,7 +913,7 @@ bot.use(async (ctx, next) => {
   }
 
   
-  // --- /添加管理 — add a sub-admin ---
+  // --- /添加管理 — add a sub-admin by TG ID ---
   if (cmd === '添加管理' || cmd.startsWith('添加管理 ')) {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
@@ -921,30 +921,21 @@ bot.use(async (ctx, next) => {
     }
     var parts = text.split(/\s+/);
     if (parts.length < 2) {
-      await ctx.reply('Usage: /添加管理 +2348012345678');
+      await ctx.reply('Usage: /添加管理 123456789');
       return;
     }
-    var phoneRaw = parts.slice(1).join('');
-    var phone = normalizePhone(phoneRaw);
-    var ph = hashPhone(phone);
-    var { data: cust } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
-    if (!cust) {
-      await ctx.reply('❌ Customer not found with phone ' + phone);
+    var tgId = parts[1].replace(/[^\d]/g, '');
+    if (!tgId) {
+      await ctx.reply('❌ Invalid Telegram ID');
       return;
     }
-    var { data: existing } = await sb.from('sub_admins').select('id').eq('customer_id', cust.id).maybeSingle();
+    var { data: existing } = await sb.from('sub_admins').select('id').eq('telegram_id', tgId).maybeSingle();
     if (existing) {
-      await ctx.reply('⚠️ Already a sub-admin');
-      return;
-    }
-    var { data: custFull } = await sb.from('customers').select('telegram_id').eq('id', cust.id).maybeSingle();
-    if (!custFull || !custFull.telegram_id) {
-      await ctx.reply('❌ Customer has no telegram_id. Use /vip first.');
+      await ctx.reply('⚠️ This Telegram ID is already a sub-admin');
       return;
     }
     var { error: insErr } = await sb.from('sub_admins').insert({
-      telegram_id: custFull.telegram_id,
-      customer_id: cust.id,
+      telegram_id: tgId,
       created_by: null
     });
     if (insErr) {
@@ -952,11 +943,11 @@ bot.use(async (ctx, next) => {
       return;
     }
     await refreshSubAdminCache();
-    await ctx.reply('✅ Sub-admin added: ' + phone);
+    await ctx.reply('✅ Sub-admin added (TG ID: ' + tgId + '). They can now use the bot.');
     return;
   }
 
-  // --- /删除管理 — remove a sub-admin ---
+    //   // --- /删除管理 — remove a sub-admin by TG ID ---
   if (cmd === '删除管理' || cmd.startsWith('删除管理 ')) {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
@@ -964,28 +955,30 @@ bot.use(async (ctx, next) => {
     }
     var parts = text.split(/\s+/);
     if (parts.length < 2) {
-      await ctx.reply('Usage: /删除管理 +2348012345678');
+      await ctx.reply('Usage: /删除管理 123456789');
       return;
     }
-    var phoneRaw = parts.slice(1).join('');
-    var phone = normalizePhone(phoneRaw);
-    var ph = hashPhone(phone);
-    var { data: cust } = await sb.from('customers').select('id').eq('phone_hash', ph).maybeSingle();
-    if (!cust) {
-      await ctx.reply('❌ Customer not found with phone ' + phone);
+    var tgId = parts[1].replace(/[^\d]/g, '');
+    if (!tgId) {
+      await ctx.reply('❌ Invalid Telegram ID');
       return;
     }
-    var { error: delErr } = await sb.from('sub_admins').delete().eq('customer_id', cust.id);
+    var { data: sub } = await sb.from('sub_admins').select('id').eq('telegram_id', tgId).maybeSingle();
+    if (!sub) {
+      await ctx.reply('⚠️ Not a sub-admin');
+      return;
+    }
+    var { error: delErr } = await sb.from('sub_admins').delete().eq('id', sub.id);
     if (delErr) {
-      await ctx.reply('❌ Failed to remove sub-admin: ' + delErr.message);
+      await ctx.reply('❌ Failed to remove: ' + delErr.message);
       return;
     }
     await refreshSubAdminCache();
-    await ctx.reply('✅ Sub-admin removed: ' + phone);
+    await ctx.reply('✅ Sub-admin removed (TG ID: ' + tgId + ')');
     return;
   }
 
-  // --- /查看管理 — list all sub-admins ---
+    // --- /查看管理 — list all sub-admins ---
   if (cmd === '查看管理') {
     if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only main admin can use this');
@@ -1093,8 +1086,8 @@ bot.use(async (ctx, next) => {
       '/结算' + ''.padEnd(24) + '— 结算指定月份佣金\n' +
       '/注册' + ''.padEnd(24) + '— 直接注册手机号为会员\n' +
       '/我的信息' + ''.padEnd(24) + '— 查看当前绑定客户的信息\n' +
-      '/添加管理' + ''.padEnd(20) + '— 添加子管理员\n' +
-      '/删除管理' + ''.padEnd(20) + '— 移除子管理员\n' +
+      '/添加管理' + ''.padEnd(20) + '— 添加子管理员 (TG ID)\n' +
+      '/删除管理' + ''.padEnd(20) + '— 移除子管理员 (TG ID)\n' +
       '/查看管理' + ''.padEnd(20) + '— 查看所有子管理员\n' +
       '/bindbank' + ''.padEnd(20) + '— 绑定银行账户到当前聊天窗\n' +
       '/fixreferrer' + ''.padEnd(17) + '— 修正客户的推荐人（管理员）' + '\n'
