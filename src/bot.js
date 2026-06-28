@@ -934,7 +934,7 @@ bot.use(async (ctx, next) => {
       if (mt.length > 5) tgId = mt;
     }
     if (!tgId) {
-      await ctx.reply('Usage: /添加管理 123456789  or reply to someone's message with /添加管理');
+      await ctx.reply("Usage: /添加管理 123456789  or reply to someone's message with /添加管理");
       return;
     }
     var { data: existing } = await sb.from('sub_admins').select('id').eq('telegram_id', tgId).maybeSingle();
