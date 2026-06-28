@@ -1224,11 +1224,12 @@ bot.use(async (ctx, next) => {
         try { agentPhone = decryptPhone(agent.phone_encrypted); } catch(e) {}
       }
       // Get all transactions from customers under this agent
-      var { data: txns } = await sb.from('transactions').select('amount, created_at').gte('created_at', targetMonth + '-01').lt('created_at', targetMonth + '-31');
-      if (!txns) txns = [];
+      var { data: members } = await sb.from('customers').select('id').eq('parent_agent_id', agentId);
       var total = 0;
-      for (var ti = 0; ti < txns.length; ti++) {
-        if (txns[ti].amount > 0) total += txns[ti].amount;
+      if (members && members.length > 0) {
+        var memberIds = members.map(function(m) { return m.id; });
+        var { data: txns } = await sb.from('transactions').select('amount').in('customer_id', memberIds).gte('created_at', targetMonth + '-01').lt('created_at', targetMonth + '-31');
+        if (txns) for (var ti = 0; ti < txns.length; ti++) { if (txns[ti].amount > 0) total += txns[ti].amount; }
       }
       var rate = agent.agent_commission_rate || 2;
       var payable = total * rate / 100;
@@ -1243,12 +1244,27 @@ bot.use(async (ctx, next) => {
       return;
     }
 
-    // List all agents
+    //     // List all agents
     var { data: agents } = await sb.from('customers').select('id, public_id, agent_id, agent_commission_rate').eq('is_agent', true);
     if (!agents || agents.length === 0) {
       await ctx.reply('No agents found.');
       return;
     }
+    var lines = ['\U0001f3e6 Agent Report: ' + targetMonth, ''];
+    for (var ai = 0; ai < agents.length; ai++) {
+      var ag = agents[ai];
+      var { data: members } = await sb.from('customers').select('id').eq('parent_agent_id', ag.agent_id);
+      var totalVol = 0;
+      if (members && members.length > 0) {
+        var memberIds = members.map(function(m) { return m.id; });
+        var { data: txns } = await sb.from('transactions').select('amount').in('customer_id', memberIds).gte('created_at', targetMonth + '-01').lt('created_at', targetMonth + '-31');
+        if (txns) for (var tj = 0; tj < txns.length; tj++) { if (txns[tj].amount > 0) totalVol += txns[tj].amount; }
+      }
+      var r = ag.agent_commission_rate || 2;
+      lines.push(ag.agent_id + ' ' + ag.public_id + ' | Vol: \u20a6' + Number(totalVol).toLocaleString() + ' | Pay: \u20a6' + Number(totalVol*r/100).toLocaleString());
+    }
+    await ctx.reply(lines.join('\n'));
+    return;
     var lines = ['🏦 Agent Report: ' + targetMonth, ''];
     for (var ai = 0; ai < agents.length; ai++) {
       var ag = agents[ai];
