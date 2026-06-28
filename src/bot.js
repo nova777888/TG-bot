@@ -1097,8 +1097,7 @@ bot.use(async (ctx, next) => {
       '/删除管理' + ''.padEnd(20) + '— 移除子管理员\n' +
       '/查看管理' + ''.padEnd(20) + '— 查看所有子管理员\n' +
       '/bindbank' + ''.padEnd(20) + '— 绑定银行账户到当前聊天窗\n' +
-      '/fixreferrer' + ''.padEnd(17) + '— 修正客户的推荐人（管理员）' + '\n' +
-
+      '/fixreferrer' + ''.padEnd(17) + '— 修正客户的推荐人（管理员）' + '\n'
     );
     return;
   }
