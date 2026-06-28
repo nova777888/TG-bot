@@ -1082,7 +1082,7 @@ bot.use(async (ctx, next) => {
 
   // --- /检查号码 — check if a phone has a referrer ---
   if (cmd === '检查号码' || cmd.startsWith('检查号码 ')) {
-    if (!isAdmin(ctx.from.id)) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only admin can use this');
       return;
     }
@@ -1111,7 +1111,7 @@ bot.use(async (ctx, next) => {
 
   // --- /添加代理 — create an agent with AGTXXXX ID ---
   if (cmd === '添加代理' || cmd.startsWith('添加代理 ')) {
-    if (!isAdmin(ctx.from.id)) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only admin can use this');
       return;
     }
@@ -1164,7 +1164,7 @@ bot.use(async (ctx, next) => {
 
   // --- /确认代理 — confirm agent creation even with referrer ---
   if (cmd === '确认代理' || cmd.startsWith('确认代理 ')) {
-    if (!isAdmin(ctx.from.id)) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only admin can use this');
       return;
     }
@@ -1195,7 +1195,7 @@ bot.use(async (ctx, next) => {
 
   // --- /代理报表 — view agent monthly report ---
   if (cmd === '代理报表' || cmd.startsWith('代理报表 ')) {
-    if (!isAdmin(ctx.from.id)) {
+    if (!ADMIN_TG_IDS.includes(ctx.from.id)) {
       await ctx.reply('⛔ Only admin can use this');
       return;
     }
